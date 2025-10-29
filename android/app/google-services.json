@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "718904534981",
+    "project_id": "ridefix-9ca5c",
+    "storage_bucket": "ridefix-9ca5c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:718904534981:android:a94c683f94cff75c368dac",
+        "android_client_info": {
+          "package_name": "com.example.ridefix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCc-BoP1Ubs7z7k6wmHs2xjua3-vVr24Xw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
