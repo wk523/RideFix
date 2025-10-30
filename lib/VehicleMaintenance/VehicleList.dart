@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
-// NOTE: I am referencing the service instance now correctly based on your provided path/name.
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
-// --- Vehicle List Page Widget ---
-class VehicleListPage extends StatelessWidget {
+// --- Vehicle List Page Widget (Now Stateful) ---
+class VehicleListPage extends StatefulWidget {
   const VehicleListPage({super.key});
 
   @override
+  State<VehicleListPage> createState() => _VehicleListPageState();
+}
+
+class _VehicleListPageState extends State<VehicleListPage> {
+  @override
   Widget build(BuildContext context) {
-    // Scaffold provides the grey background and overall structure
     return Scaffold(
       backgroundColor: Colors.grey[200],
 
-      // Blue AppBar matching the screenshot
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            // Handle back navigation or menu open
+            Navigator.pop(context);
           },
         ),
         title: const Text(
@@ -29,18 +32,15 @@ class VehicleListPage extends StatelessWidget {
         centerTitle: true,
       ),
 
-      // FIX: Use FutureBuilder to wait for Firebase initialization to complete.
+      // --- FutureBuilder to wait for initialization ---
       body: FutureBuilder(
         future: vehicleDataService.initializationComplete,
         builder: (context, snapshot) {
-          // 1. Show Loading while waiting for Firebase/Auth initialization
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // 2. Handle Initialization Errors
           if (snapshot.hasError) {
-            // This catches the 'CRITICAL ERROR' thrown in the service file
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -74,18 +74,14 @@ class VehicleListPage extends StatelessWidget {
             );
           }
 
-          // 3. Once initialized, listen to the vehicle stream
-          // The StreamBuilder now runs only after the service is ready.
+          // --- StreamBuilder for vehicles list ---
           return StreamBuilder<List<Vehicle>>(
             stream: vehicleDataService.vehiclesStream,
             builder: (context, streamSnapshot) {
-              // Show Loading while waiting for initial data fetch (which is fast,
-              // but necessary for the first network request).
               if (streamSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              // Handle errors during data fetching (if connection succeeded but query failed)
               if (streamSnapshot.hasError) {
                 return Center(
                   child: Text(
@@ -106,7 +102,6 @@ class VehicleListPage extends StatelessWidget {
                 );
               }
 
-              // Display the list of vehicles
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16.0,
@@ -126,19 +121,28 @@ class VehicleListPage extends StatelessWidget {
         },
       ),
 
-      // Floating Action Button for adding a new vehicle
+      // --- Floating Action Button ---
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Navigate to the Vehicle Registration Page
-        },
         backgroundColor: Colors.blue,
         child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () async {
+          // Wait for the registration page to complete
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const VehicleRegistrationPage(),
+            ),
+          );
+
+          // Refresh the list when coming back
+          setState(() {});
+        },
       ),
     );
   }
 }
 
-// --- Helper Widget for the Vehicle Card UI (Kept the same) ---
+// --- Helper Widget for the Vehicle Card UI ---
 class VehicleListCard extends StatelessWidget {
   final Vehicle vehicle;
 
@@ -146,10 +150,8 @@ class VehicleListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use an InkWell for tap detection (to go to the details page)
     return InkWell(
       onTap: () {
-        // Handle navigation to VehicleDetailsPage
         print('Tapped on ${vehicle.model}');
       },
       child: Container(
@@ -191,7 +193,6 @@ class VehicleListCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Model Title (e.g., Honda Civic)
                   Text(
                     vehicle.model,
                     style: const TextStyle(
@@ -201,7 +202,6 @@ class VehicleListCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8.0),
 
-                  // Plate Number and Mileage Info
                   Row(
                     children: [
                       const Icon(Icons.numbers, size: 16, color: Colors.blue),
