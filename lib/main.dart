@@ -1,10 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -33,8 +36,8 @@ class MyApp extends StatelessWidget {
       ),
 
       // Set the VehicleListScreen as the home screen
-      home: VehicleDetailsPage(details: mockDetails),
-      // home: UpdateVehiclePage(),
+      // home: VehicleDetailsPage(details: mockDetails),
+      home: VehicleListPage(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }
