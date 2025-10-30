@@ -29,22 +29,6 @@ class VehicleDetails {
   });
 }
 
-// --- Sample Data (To run the screen) ---
-final VehicleDetails mockDetails = VehicleDetails(
-  plateNumber: 'XXX 1234',
-  model: 'Honda Civic',
-  color: 'White',
-  year: 2017,
-  mileage: 2409190,
-  roadTaxExpiry: '08/03/26',
-  serviceHistoryCount: 10,
-  fuelEntriesCount: 20,
-  totalExpenses: 3010.00,
-  avgMonthlyExpenses: 1505.00,
-  imageUrl:
-      'assets/honda_civic_detail.jpg', // **Ensure this asset path is correct**
-);
-
 // ------------------------------------------------------------------
 // --- Vehicle Details Page Widget ---
 // ------------------------------------------------------------------
@@ -58,7 +42,6 @@ class VehicleDetailsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[200],
 
-      // Blue AppBar
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
@@ -79,71 +62,76 @@ class VehicleDetailsPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         children: [
-          // --- 1. Vehicle Image ---
+          // --- 1. Vehicle Image (FULL WIDTH, SAME SIZE) ---
           ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: Image.asset(
-              details.imageUrl,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: 200,
-              errorBuilder: (context, error, stackTrace) => Container(
+            borderRadius: BorderRadius.circular(10),
+            child: AspectRatio(
+              aspectRatio: 16 / 9, // Maintain consistent rectangle ratio
+              child: Image.network(
+                details.imageUrl,
+                fit: BoxFit.contain, // ✅ show whole image, auto adjust size
                 width: double.infinity,
-                height: 200,
-                color: Colors.grey[300],
-                child: const Icon(
-                  Icons.directions_car,
-                  color: Colors.grey,
-                  size: 60,
+                height: 220, // adjust height as you wish
+                alignment: Alignment.center,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(
+                      Icons.directions_car,
+                      color: Colors.grey,
+                      size: 60,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
 
-          const SizedBox(height: 10.0),
+          const SizedBox(height: 12.0),
 
-          // --- 2. Action Buttons Row (Icons outside the image) ---
+          // --- 2. Edit & Delete Buttons Row ---
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Edit Button
               IconButton(
-                icon: Icon(
-                  Icons.edit,
-                  color: Colors.grey[600], // Visible on grey background
-                  size: 24,
-                ),
+                icon: const Icon(Icons.edit, color: Colors.grey, size: 24),
                 onPressed: () {
-                  /* Handle Edit */
+                  // TODO: Handle Edit
                 },
               ),
-              // Delete Button
               IconButton(
-                icon: Icon(
-                  Icons.delete,
-                  color: Colors.grey[600], // Visible on grey background
-                  size: 24,
-                ),
+                icon: const Icon(Icons.delete, color: Colors.grey, size: 24),
                 onPressed: () {
-                  /* Handle Delete */
+                  // TODO: Handle Delete
                 },
               ),
             ],
           ),
 
-          const SizedBox(height: 10.0), // Space before the detail card
-          // --- 3. Details Card/Container ---
+          const SizedBox(height: 8.0),
+
+          // --- 3. Details Card ---
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: Colors.grey.shade300, width: 1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Vehicle Model Title
                 Text(
                   details.model,
                   style: const TextStyle(
@@ -154,7 +142,6 @@ class VehicleDetailsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12.0),
 
-                // Details List
                 DetailRow(
                   label: 'Vehicle Plate Number',
                   value: details.plateNumber,
@@ -164,33 +151,30 @@ class VehicleDetailsPage extends StatelessWidget {
                   label: 'Manufacture Year',
                   value: details.year.toString(),
                 ),
-                DetailRow(label: 'Mileage', value: details.mileage.toString()),
+                DetailRow(label: 'Mileage', value: '${details.mileage} km'),
                 DetailRow(
-                  label: 'Road Tax Expired',
+                  label: 'Road Tax Expiry',
                   value: details.roadTaxExpiry,
                 ),
 
-                // Separator for the statistics section
                 const Divider(height: 24, thickness: 1, color: Colors.grey),
 
                 DetailRow(
-                  label: 'Services Histories',
+                  label: 'Service Histories',
                   value: details.serviceHistoryCount.toString(),
                 ),
                 DetailRow(
                   label: 'Fuel Entries',
                   value: details.fuelEntriesCount.toString(),
                 ),
-
-                // Format currency
                 DetailRow(
                   label: 'Total Expenses',
-                  value: '${details.totalExpenses.toStringAsFixed(2)}',
+                  value: 'RM ${details.totalExpenses.toStringAsFixed(2)}',
                   valueColor: Colors.red,
                 ),
                 DetailRow(
                   label: 'Avg. Monthly Expenses',
-                  value: '${details.avgMonthlyExpenses.toStringAsFixed(2)}',
+                  value: 'RM ${details.avgMonthlyExpenses.toStringAsFixed(2)}',
                 ),
               ],
             ),
@@ -221,12 +205,10 @@ class DetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left side (Label)
           Text(
-            '$label :',
+            '$label:',
             style: const TextStyle(fontSize: 16, color: Colors.black87),
           ),
-          // Right side (Value)
           Text(
             value,
             style: TextStyle(

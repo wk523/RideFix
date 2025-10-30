@@ -1,13 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
+const supabaseUrl = 'https://jxcmwksfbyqeiyrxcada.supabase.co';
+const supabaseKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4Y213a3NmYnlxZWl5cnhjYWRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MzczMDQsImV4cCI6MjA3NzMxMzMwNH0.UlQkbjiVNOlb1SfqPBYUdOntkuRLbyIl_EELaw3McmY";
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   runApp(const MyApp());
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
 // --- Vehicle List Page Widget (Now Stateful) ---
@@ -142,6 +143,10 @@ class _VehicleListPageState extends State<VehicleListPage> {
   }
 }
 
+extension on VehicleDataService {
+  Future<Object?>? get initializationComplete => null;
+}
+
 // --- Helper Widget for the Vehicle Card UI ---
 class VehicleListCard extends StatelessWidget {
   final Vehicle vehicle;
@@ -152,7 +157,28 @@ class VehicleListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        print('Tapped on ${vehicle.model}');
+        // ✅ Navigate to Vehicle Details Page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleDetailsPage(
+              details: VehicleDetails(
+                plateNumber: vehicle.plateNumber,
+                model: vehicle.model,
+                color: vehicle.color,
+                year: int.tryParse(vehicle.manYear) ?? 0,
+                mileage: int.tryParse(vehicle.mileage) ?? 0,
+                roadTaxExpiry: vehicle.roadTaxExpired,
+                //hard coded for now (wait other modules)
+                serviceHistoryCount: 10, // You can link with Firestore later
+                fuelEntriesCount: 20,
+                totalExpenses: 3010.00,
+                avgMonthlyExpenses: 1505.00,
+                imageUrl: vehicle.imageUrl, // ✅ From Supabase (URL)
+              ),
+            ),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(12.0),
@@ -170,21 +196,34 @@ class VehicleListCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Vehicle Image (Left side)
+            // ✅ Vehicle Image (Fix: use Image.network instead of Image.asset)
             ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: Image.asset(
-                vehicle.imageUrl,
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 80,
-                  height: 80,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.directions_car, color: Colors.grey),
-                ),
-              ),
+              child: vehicle.imageUrl.isNotEmpty
+                  ? Image.network(
+                      vehicle.imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.grey[300],
+                        child: const Icon(
+                          Icons.directions_car,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: Colors.grey,
+                      ),
+                    ),
             ),
             const SizedBox(width: 15.0),
 
@@ -193,15 +232,27 @@ class VehicleListCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    vehicle.model,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        vehicle.brand,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 2.0),
+                      Text(
+                        vehicle.model,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8.0),
 
+                  const SizedBox(height: 8.0),
                   Row(
                     children: [
                       const Icon(Icons.numbers, size: 16, color: Colors.blue),
