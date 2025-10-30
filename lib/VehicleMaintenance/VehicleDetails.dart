@@ -1,47 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 
-// --- Data Model for Vehicle Details ---
-class VehicleDetails {
-  final String plateNumber;
-  final String model;
-  final String color;
-  final int year;
-  final int mileage;
-  final String roadTaxExpiry;
-  final int serviceHistoryCount;
-  final int fuelEntriesCount;
-  final double totalExpenses;
-  final double avgMonthlyExpenses;
-  final String imageUrl;
+class VehicleDetailsPage extends StatefulWidget {
+  final String vehicleId;
+  final String ownerId;
 
-  VehicleDetails({
-    required this.plateNumber,
-    required this.model,
-    required this.color,
-    required this.year,
-    required this.mileage,
-    required this.roadTaxExpiry,
-    required this.serviceHistoryCount,
-    required this.fuelEntriesCount,
-    required this.totalExpenses,
-    required this.avgMonthlyExpenses,
-    required this.imageUrl,
+  const VehicleDetailsPage({
+    super.key,
+    required this.vehicleId,
+    required this.ownerId,
   });
+
+  @override
+  State<VehicleDetailsPage> createState() => _VehicleDetailsPageState();
 }
 
-// ------------------------------------------------------------------
-// --- Vehicle Details Page Widget ---
-// ------------------------------------------------------------------
-class VehicleDetailsPage extends StatelessWidget {
-  final VehicleDetails details;
-
-  const VehicleDetailsPage({super.key, required this.details});
+class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
+  // 🔁 Used to trigger rebuild when coming back from update page
+  bool _forceRefresh = false;
 
   @override
   Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      key: ValueKey(_forceRefresh), // ensures rebuild when toggled
+      stream: FirebaseFirestore.instance
+          .collection('Vehicle')
+          .doc(widget.vehicleId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Scaffold(body: Center(child: Text('Vehicle not found')));
+        }
+
+        final vehicle = Vehicle.fromFirestore(snapshot.data!);
+        return _buildVehicleDetailUI(context, vehicle);
+      },
+    );
+  }
+
+  Widget _buildVehicleDetailUI(BuildContext context, Vehicle vehicle) {
+    // ✅ Hardcoded values (you can later connect to Firestore or analytics)
+    const serviceHistoryCount = 10;
+    const fuelEntriesCount = 20;
+    const totalExpenses = 3010.00;
+    const avgMonthlyExpenses = 1505.00;
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
-
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
@@ -50,7 +63,7 @@ class VehicleDetailsPage extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          details.plateNumber,
+          vehicle.plateNumber,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -58,20 +71,19 @@ class VehicleDetailsPage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         children: [
-          // --- 1. Vehicle Image (FULL WIDTH, SAME SIZE) ---
+          // --- Vehicle Image ---
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: AspectRatio(
-              aspectRatio: 16 / 9, // Maintain consistent rectangle ratio
+              aspectRatio: 16 / 9,
               child: Image.network(
-                details.imageUrl,
-                fit: BoxFit.contain, // ✅ show whole image, auto adjust size
+                vehicle.imageUrl,
+                fit: BoxFit.contain,
                 width: double.infinity,
-                height: 220, // adjust height as you wish
+                height: 220,
                 alignment: Alignment.center,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
@@ -93,20 +105,31 @@ class VehicleDetailsPage extends StatelessWidget {
 
           const SizedBox(height: 12.0),
 
-          // --- 2. Edit & Delete Buttons Row ---
+          // --- Edit & Delete Buttons ---
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.grey, size: 24),
-                onPressed: () {
-                  // TODO: Handle Edit
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          UpdateVehiclePage(vehicleDetails: vehicle),
+                    ),
+                  );
+
+                  // ✅ After update, rebuild StreamBuilder manually
+                  if (result == true) {
+                    setState(() => _forceRefresh = !_forceRefresh);
+                  }
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.delete, color: Colors.grey, size: 24),
-                onPressed: () {
-                  // TODO: Handle Delete
+                onPressed: () async {
+                  await vehicleDataService.deleteVehicle(context, vehicle);
                 },
               ),
             ],
@@ -114,7 +137,7 @@ class VehicleDetailsPage extends StatelessWidget {
 
           const SizedBox(height: 8.0),
 
-          // --- 3. Details Card ---
+          // --- Vehicle Details Card ---
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
@@ -132,50 +155,44 @@ class VehicleDetailsPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  details.model,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      vehicle.brand,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 5.0),
+                    Text(
+                      vehicle.model,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12.0),
-
                 DetailRow(
                   label: 'Vehicle Plate Number',
-                  value: details.plateNumber,
+                  value: vehicle.plateNumber,
                 ),
-                DetailRow(label: 'Color', value: details.color),
-                DetailRow(
-                  label: 'Manufacture Year',
-                  value: details.year.toString(),
-                ),
-                DetailRow(label: 'Mileage', value: '${details.mileage} km'),
+                DetailRow(label: 'Color', value: vehicle.color),
+                DetailRow(label: 'Manufacture Year', value: vehicle.manYear),
+                DetailRow(label: 'Mileage', value: '${vehicle.mileage} km'),
                 DetailRow(
                   label: 'Road Tax Expiry',
-                  value: details.roadTaxExpiry,
+                  value: vehicle.roadTaxExpired,
                 ),
-
-                const Divider(height: 24, thickness: 1, color: Colors.grey),
-
-                DetailRow(
-                  label: 'Service Histories',
-                  value: details.serviceHistoryCount.toString(),
-                ),
-                DetailRow(
-                  label: 'Fuel Entries',
-                  value: details.fuelEntriesCount.toString(),
-                ),
-                DetailRow(
-                  label: 'Total Expenses',
-                  value: 'RM ${details.totalExpenses.toStringAsFixed(2)}',
-                  valueColor: Colors.red,
-                ),
-                DetailRow(
-                  label: 'Avg. Monthly Expenses',
-                  value: 'RM ${details.avgMonthlyExpenses.toStringAsFixed(2)}',
-                ),
+                SizedBox(height: 10),
+                DetailRow(label: 'Service History Count', value: '10'),
+                DetailRow(label: 'Fuel Entries Count', value: '20'),
+                DetailRow(label: 'Total Expenses (RM)', value: '3010.00'),
+                DetailRow(label: 'Avg Monthly Expenses (RM)', value: '1505.00'),
               ],
             ),
           ),
@@ -185,7 +202,7 @@ class VehicleDetailsPage extends StatelessWidget {
   }
 }
 
-// --- Helper Widget for Key/Value Rows ---
+// --- Helper Widget ---
 class DetailRow extends StatelessWidget {
   final String label;
   final String value;
@@ -209,12 +226,15 @@ class DetailRow extends StatelessWidget {
             '$label:',
             style: const TextStyle(fontSize: 16, color: Colors.black87),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: valueColor,
+              ),
             ),
           ),
         ],

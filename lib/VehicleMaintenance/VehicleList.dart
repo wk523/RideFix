@@ -162,20 +162,8 @@ class VehicleListCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => VehicleDetailsPage(
-              details: VehicleDetails(
-                plateNumber: vehicle.plateNumber,
-                model: vehicle.model,
-                color: vehicle.color,
-                year: int.tryParse(vehicle.manYear) ?? 0,
-                mileage: int.tryParse(vehicle.mileage) ?? 0,
-                roadTaxExpiry: vehicle.roadTaxExpired,
-                //hard coded for now (wait other modules)
-                serviceHistoryCount: 10, // You can link with Firestore later
-                fuelEntriesCount: 20,
-                totalExpenses: 3010.00,
-                avgMonthlyExpenses: 1505.00,
-                imageUrl: vehicle.imageUrl, // ✅ From Supabase (URL)
-              ),
+              vehicleId: vehicle.vehicleId,
+              ownerId: '', // ✅ This must not be empty
             ),
           ),
         );

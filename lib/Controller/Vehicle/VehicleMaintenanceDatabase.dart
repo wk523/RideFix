@@ -1,5 +1,5 @@
-// lib/Controller/Vehicle/VehicleMaintenanceDatabase.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,7 +33,7 @@ class Vehicle {
   factory Vehicle.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Vehicle(
-      vehicleId: data['Vehicleid'] ?? '',
+      vehicleId: data['Vehicleid'] ?? doc.id, // ✅ fallback to doc.id
       brand: data['Brand'] ?? '',
       color: data['Color'] ?? '',
       model: data['Model'] ?? '',
@@ -158,8 +158,15 @@ class VehicleDataService {
   // -------------------------
   Future<void> registerVehicle(Vehicle vehicle) async {
     try {
-      final upperVehicle = Vehicle(
-        vehicleId: vehicle.vehicleId,
+      final vehicleId = vehicle.vehicleId.isEmpty
+          ? _firestore
+                .collection('Vehicle')
+                .doc()
+                .id // ✅ auto-generate ID
+          : vehicle.vehicleId;
+
+      final newVehicle = Vehicle(
+        vehicleId: vehicleId,
         brand: vehicle.brand.trim().toUpperCase(),
         color: vehicle.color.trim().toUpperCase(),
         model: vehicle.model.trim().toUpperCase(),
@@ -171,13 +178,13 @@ class VehicleDataService {
         imageUrl: vehicle.imageUrl,
       );
 
-      final error = validateVehicleData(upperVehicle);
+      final error = validateVehicleData(newVehicle);
       if (error != null) throw Exception(error);
 
       await _firestore
           .collection('Vehicle')
-          .doc(upperVehicle.vehicleId)
-          .set(upperVehicle.toMap());
+          .doc(vehicleId)
+          .set(newVehicle.toMap());
       print('✅ Vehicle registered (Firestore).');
     } catch (e) {
       print('❌ Error registering vehicle: $e');
@@ -197,6 +204,181 @@ class VehicleDataService {
     return _firestore.collection('Vehicle').snapshots().map((snap) {
       return snap.docs.map((d) => Vehicle.fromFirestore(d)).toList();
     });
+  }
+
+  // -------------------------
+  // Upload a new image to Supabase (reusable)
+  // -------------------------
+  Future<String?> uploadVehicleImageFromBytes(
+    Uint8List bytes,
+    String plateNumber,
+  ) async {
+    try {
+      final normalizedPlate = (plateNumber.trim().isEmpty)
+          ? 'UNKNOWN'
+          : plateNumber.trim().toUpperCase();
+      final fileName =
+          '${normalizedPlate}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final res = await Supabase.instance.client.storage
+          .from('vehicle_images')
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+
+      final publicUrl = Supabase.instance.client.storage
+          .from('vehicle_images')
+          .getPublicUrl(fileName);
+
+      print('✅ Uploaded image to Supabase: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('❌ Upload failed: $e');
+      return null;
+    }
+  }
+
+  // -------------------------
+  // Delete old image from Supabase
+  // -------------------------
+  Future<void> deleteVehicleImage(String? url) async {
+    if (url == null || url.isEmpty) return;
+    try {
+      final uri = Uri.parse(url);
+      final fileName = uri.pathSegments.last;
+      await Supabase.instance.client.storage.from('vehicle_images').remove([
+        fileName,
+      ]);
+      print('🗑️ Deleted old image: $fileName');
+    } catch (e) {
+      print('⚠️ Failed to delete old image: $e');
+    }
+  }
+
+  // -------------------------
+  // Update Vehicle (with optional new image)
+  // -------------------------
+  Future<void> updateVehicle(
+    Vehicle updatedVehicle, {
+    Uint8List? newImageBytes,
+  }) async {
+    try {
+      if (updatedVehicle.vehicleId.isEmpty) {
+        throw Exception("Vehicle ID is missing");
+      }
+
+      String finalImageUrl = updatedVehicle.imageUrl;
+
+      // ✅ If new image selected
+      if (newImageBytes != null) {
+        // Delete old one first (if any)
+        if (updatedVehicle.imageUrl.isNotEmpty) {
+          await deleteVehicleImage(updatedVehicle.imageUrl);
+        }
+
+        // Upload new one
+        final uploadedUrl = await uploadVehicleImageFromBytes(
+          newImageBytes,
+          updatedVehicle.plateNumber,
+        );
+
+        if (uploadedUrl != null) {
+          finalImageUrl = uploadedUrl;
+        } else {
+          throw Exception("Image upload failed");
+        }
+      }
+
+      // ✅ Create a copy of vehicle with new URL
+      final updatedMap = updatedVehicle.toMap()..['imageUrl'] = finalImageUrl;
+
+      // ✅ Validate before saving
+      final error = validateVehicleData(updatedVehicle);
+      if (error != null) throw Exception(error);
+
+      await _firestore
+          .collection('Vehicle')
+          .doc(updatedVehicle.vehicleId)
+          .update(updatedMap);
+
+      print('✅ Vehicle updated successfully in Firestore.');
+    } catch (e) {
+      print('❌ Error updating vehicle: $e');
+      rethrow;
+    }
+  }
+
+  // -------------------------
+  // Delete Vehicle (Firestore + Image)
+  // -------------------------
+  Future<void> deleteVehicle(BuildContext context, Vehicle vehicle) async {
+    try {
+      // ✅ Confirm before deletion
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text(
+              'Confirm Deletion',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              'Are you sure you want to delete this vehicle?\n\n'
+              'Brand: ${vehicle.brand}\n'
+              'Model: ${vehicle.model}\n'
+              'Plate Number: ${vehicle.plateNumber}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirm != true) return; // user cancelled ❌
+
+      // ✅ Delete Firestore doc
+      await FirebaseFirestore.instance
+          .collection('Vehicle')
+          .doc(vehicle.vehicleId)
+          .delete();
+
+      // ✅ Delete from Supabase (if image exists)
+      await vehicleDataService.deleteVehicleImage(vehicle.imageUrl);
+
+      // ✅ Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vehicle deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Go back after deletion
+      }
+
+      print('🗑️ Vehicle deleted successfully: ${vehicle.vehicleId}');
+    } catch (e) {
+      print('❌ Error deleting vehicle: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting vehicle: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

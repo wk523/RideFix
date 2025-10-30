@@ -1,23 +1,133 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 
-// --- Vehicle Registration Page Widget ---
-class UpdateVehiclePage extends StatelessWidget {
-  const UpdateVehiclePage({super.key});
+class UpdateVehiclePage extends StatefulWidget {
+  final Vehicle vehicleDetails;
 
+  const UpdateVehiclePage({super.key, required this.vehicleDetails});
+
+  @override
+  State<UpdateVehiclePage> createState() => _UpdateVehiclePageState();
+}
+
+class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
+  final VehicleDataService _vehicleService = VehicleDataService();
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController brandController;
+  late TextEditingController modelController;
+  late TextEditingController plateController;
+  late TextEditingController colorController;
+  late TextEditingController yearController;
+  late TextEditingController mileageController;
+  late TextEditingController roadTaxController;
+
+  Uint8List? newImageBytes;
+  String? previewUrl;
+  String? oldImageUrl;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.vehicleDetails;
+    brandController = TextEditingController(text: v.brand);
+    modelController = TextEditingController(text: v.model);
+    plateController = TextEditingController(text: v.plateNumber);
+    colorController = TextEditingController(text: v.color);
+    yearController = TextEditingController(text: v.manYear);
+    mileageController = TextEditingController(text: v.mileage);
+    roadTaxController = TextEditingController(text: v.roadTaxExpired);
+    previewUrl = v.imageUrl;
+    oldImageUrl = v.imageUrl;
+  }
+
+  @override
+  void dispose() {
+    brandController.dispose();
+    modelController.dispose();
+    plateController.dispose();
+    colorController.dispose();
+    yearController.dispose();
+    mileageController.dispose();
+    roadTaxController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickNewImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          newImageBytes = bytes;
+          oldImageUrl = '';
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error picking image: $e');
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final updatedVehicle = Vehicle(
+        vehicleId: widget.vehicleDetails.vehicleId,
+        brand: brandController.text.trim().toUpperCase(),
+        color: colorController.text.trim().toUpperCase(),
+        model: modelController.text.trim().toUpperCase(),
+        plateNumber: plateController.text.trim().toUpperCase(),
+        manYear: yearController.text.trim(),
+        ownerId: widget.vehicleDetails.ownerId,
+        roadTaxExpired: roadTaxController.text.trim(),
+        mileage: mileageController.text.trim(),
+        imageUrl: oldImageUrl ?? '',
+      );
+
+      await _vehicleService.updateVehicle(
+        updatedVehicle,
+        newImageBytes: newImageBytes,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Vehicle updated successfully')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating vehicle: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Failed to update: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
-
-      // Blue AppBar
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            /* Handle back navigation */
-          },
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Update Vehicle',
@@ -25,144 +135,243 @@ class UpdateVehiclePage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-
       body: ListView(
-        // Increased top padding from 20.0 to 30.0 for better spacing
-        padding: const EdgeInsets.fromLTRB(20.0, 50.0, 20.0, 20.0),
+        padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
         children: [
-          // --- 1. Vehicle Image Input Area --- (Now has more space above it)
+          // --- Image ---
           Center(
             child: GestureDetector(
-              onTap: () {
-                /* Handle image picking */
-              },
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.camera_alt,
-                  color: Colors.grey.shade600,
-                  size: 40,
+              onTap: _pickNewImage,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _buildImagePreview(),
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 30),
 
-          // Reduced the SizedBox here since we added padding above
-          const SizedBox(height: 40.0),
-
-          // --- 2. Input Fields Container ---
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10.0),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 2,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Brand and Model
-                Row(
-                  children: [
-                    Expanded(child: _buildInputField(hintText: 'Brand')),
-                    const SizedBox(width: 10),
-                    Expanded(child: _buildInputField(hintText: 'Model')),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Remaining Fields
-                _buildInputField(hintText: 'Vehicle Plate Number'),
-                const SizedBox(height: 10),
-                _buildInputField(hintText: 'Color'),
-                const SizedBox(height: 10),
-                _buildInputField(
-                  hintText: 'Manufacture Year',
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 10),
-                _buildInputField(
-                  hintText: 'Mileage',
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 10),
-                _buildInputField(hintText: 'Road Tax Expired Date'),
-                const SizedBox(height: 30),
-
-                // --- 3. Register Button ---
-                Padding(
-                  // Applying horizontal padding (e.g., 50.0 on each side)
-                  padding: const EdgeInsets.symmetric(horizontal: 50.0),
-                  child: SizedBox(
-                    // Set width to infinity *within this padding*
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Handle registration submission
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        // Shorter height
-                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                        // More rounded corners
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25.0),
+          // --- Form ---
+          Form(
+            key: _formKey,
+            child: _buildInputContainer([
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildUppercaseField(
+                      controller: brandController,
+                      hintText: 'Brand',
+                      validator: (v) => v!.isEmpty ? 'Brand required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildUppercaseField(
+                      controller: modelController,
+                      hintText: 'Model',
+                      validator: (v) => v!.isEmpty ? 'Model required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _buildUppercaseField(
+                controller: plateController,
+                hintText: 'Vehicle Plate Number',
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Plate required';
+                  if (!RegExp(
+                    r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]+$',
+                  ).hasMatch(v)) {
+                    return 'Must contain letters and numbers';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              _buildUppercaseField(
+                controller: colorController,
+                hintText: 'Color',
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
+                ],
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Color required';
+                  if (!RegExp(r'^[A-Za-z]+$').hasMatch(v)) {
+                    return 'Only alphabets allowed';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              _buildNumericField(
+                controller: yearController,
+                hintText: 'Manufacture Year',
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Year required';
+                  final y = int.tryParse(v);
+                  if (y == null || y < 1900 || y > DateTime.now().year + 1) {
+                    return 'Invalid year';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              _buildNumericField(
+                controller: mileageController,
+                hintText: 'Mileage',
+                validator: (v) => v!.isEmpty ? 'Mileage required' : null,
+              ),
+              const SizedBox(height: 10),
+              _buildInputField(
+                controller: roadTaxController,
+                hintText: 'Road Tax Expired Date',
+                validator: (v) => v!.isEmpty ? 'Road tax date required' : null,
+              ),
+              const SizedBox(height: 30),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SizedBox(
+                      width: double.infinity, // ✅ Make button take full width
+                      child: ElevatedButton(
+                        onPressed: _saveChanges,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14.0,
+                          ), // slightly taller
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25.0),
+                          ),
                         ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Save',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                        child: const Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
+            ]),
           ),
         ],
       ),
     );
   }
 
-  // Helper function for the compact text fields
-  Widget _buildInputField({
-    required String hintText,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
+  // ---------------- Helper Widgets ----------------
+
+  Widget _buildImagePreview() {
+    if (newImageBytes != null) {
+      return Image.memory(
+        newImageBytes!,
+        fit: BoxFit.contain,
+        width: double.infinity,
+      );
+    } else if (previewUrl != null && previewUrl!.isNotEmpty) {
+      return Image.network(
+        previewUrl!,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : const Center(child: CircularProgressIndicator()),
+        errorBuilder: (context, error, stack) => Container(
+          color: Colors.grey[300],
+          child: const Center(
+            child: Icon(Icons.directions_car, color: Colors.grey, size: 60),
+          ),
+        ),
+      );
+    } else {
+      return Container(
+        color: Colors.grey[300],
+        child: const Center(
+          child: Icon(Icons.camera_alt, color: Colors.grey, size: 50),
+        ),
+      );
+    }
+  }
+
+  Widget _buildInputContainer(List<Widget> children) {
     return Container(
-      height: 45,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(5.0),
-      ),
-      child: TextField(
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey.shade500),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12.0,
-            vertical: -4,
+        borderRadius: BorderRadius.circular(10.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 2,
           ),
-          border: InputBorder.none,
-        ),
+        ],
       ),
+      child: Column(children: children),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(5),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: _inputDecoration(hintText),
+      validator: validator,
+    );
+  }
+
+  Widget _buildUppercaseField({
+    required TextEditingController controller,
+    required String hintText,
+    String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return TextFormField(
+      controller: controller,
+      textCapitalization: TextCapitalization.characters,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      onChanged: (val) {
+        controller.value = controller.value.copyWith(
+          text: val.toUpperCase(),
+          selection: TextSelection.collapsed(offset: val.length),
+        );
+      },
+      decoration: _inputDecoration(hintText),
+    );
+  }
+
+  Widget _buildNumericField({
+    required TextEditingController controller,
+    required String hintText,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      validator: validator,
+      decoration: _inputDecoration(hintText),
     );
   }
 }
