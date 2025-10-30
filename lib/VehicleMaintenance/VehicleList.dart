@@ -1,186 +1,225 @@
 import 'package:flutter/material.dart';
+// NOTE: I am referencing the service instance now correctly based on your provided path/name.
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 
-// --- 1. Data Model for a Vehicle ---
-class Vehicle {
-  final String model;
-  final String licensePlate;
-  final String chassisNumber;
-  final String imageUrl;
-
-  Vehicle({
-    required this.model,
-    required this.licensePlate,
-    required this.chassisNumber,
-    required this.imageUrl,
-  });
-}
-
-// --- 2. Sample Data (To populate the list) ---
-final List<Vehicle> mockVehicles = [
-  Vehicle(
-    model: 'Honda Civic',
-    licensePlate: 'XXX 1234',
-    chassisNumber: '2409190',
-    // NOTE: Replace with your actual asset path
-    imageUrl: 'assets/honda_civic_1.png',
-  ),
-  Vehicle(
-    model: 'Toyota Supra',
-    licensePlate: 'XXX 0000',
-    chassisNumber: '2402427',
-    // NOTE: Replace with your actual asset path
-    imageUrl: 'assets/toyota_supra.png',
-  ),
-  Vehicle(
-    model: 'Honda Civic',
-    licensePlate: 'XXX 0001',
-    chassisNumber: '1025360',
-    // NOTE: Replace with your actual asset path
-    imageUrl: 'assets/honda_civic_2.png',
-  ),
-];
-
-// ------------------------------------------------------------------
-// --- 3. Vehicle List Screen Widget (The full page layout) ---
-// ------------------------------------------------------------------
+// --- Vehicle List Page Widget ---
 class VehicleListPage extends StatelessWidget {
   const VehicleListPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Note: The Scaffold's grey background should be set by the MaterialApp
-    // in main.dart (scaffoldBackgroundColor: Colors.grey[200]).
+    // Scaffold provides the grey background and overall structure
     return Scaffold(
-      // The blue header section
+      backgroundColor: Colors.grey[200],
+
+      // Blue AppBar matching the screenshot
       appBar: AppBar(
-        // The background color is part of the blue gradient look
         backgroundColor: Colors.blue,
-        elevation: 0, // No shadow
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            // Navigator.pop(context)
+            // Handle back navigation or menu open
           },
         ),
-        // Title centered in the blue section
         title: const Text(
           'Your Vehicles',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        // Slight padding from the top for the first card
-        padding: const EdgeInsets.only(top: 4.0),
-        child: ListView.builder(
-          itemCount: mockVehicles.length,
-          itemBuilder: (context, index) {
-            return VehicleCard(vehicle: mockVehicles[index]);
-          },
-        ),
+
+      // FIX: Use FutureBuilder to wait for Firebase initialization to complete.
+      body: FutureBuilder(
+        future: vehicleDataService.initializationComplete,
+        builder: (context, snapshot) {
+          // 1. Show Loading while waiting for Firebase/Auth initialization
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // 2. Handle Initialization Errors
+          if (snapshot.hasError) {
+            // This catches the 'CRITICAL ERROR' thrown in the service file
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 40,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Failed to load application data.',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Error: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // 3. Once initialized, listen to the vehicle stream
+          // The StreamBuilder now runs only after the service is ready.
+          return StreamBuilder<List<Vehicle>>(
+            stream: vehicleDataService.vehiclesStream,
+            builder: (context, streamSnapshot) {
+              // Show Loading while waiting for initial data fetch (which is fast,
+              // but necessary for the first network request).
+              if (streamSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // Handle errors during data fetching (if connection succeeded but query failed)
+              if (streamSnapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error loading vehicles: ${streamSnapshot.error}',
+                  ),
+                );
+              }
+
+              final vehicles = streamSnapshot.data ?? [];
+
+              if (vehicles.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No vehicles registered. Tap + to add one!',
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+
+              // Display the list of vehicles
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 10.0,
+                ),
+                itemCount: vehicles.length,
+                itemBuilder: (context, index) {
+                  final vehicle = vehicles[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10.0),
+                    child: VehicleListCard(vehicle: vehicle),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+
+      // Floating Action Button for adding a new vehicle
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Navigate to the Vehicle Registration Page
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 }
 
-class VehicleCard extends StatelessWidget {
+// --- Helper Widget for the Vehicle Card UI (Kept the same) ---
+class VehicleListCard extends StatelessWidget {
   final Vehicle vehicle;
 
-  const VehicleCard({required this.vehicle, super.key});
+  const VehicleListCard({super.key, required this.vehicle});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-      child: Padding(
-        // Slightly increased padding to give more internal space
-        padding: const EdgeInsets.all(16.0),
+    // Use an InkWell for tap detection (to go to the details page)
+    return InkWell(
+      onTap: () {
+        // Handle navigation to VehicleDetailsPage
+        print('Tapped on ${vehicle.model}');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.15),
+              spreadRadius: 1,
+              blurRadius: 3,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Vehicle Image (Increased size)
+            // Vehicle Image (Left side)
             ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
               child: Image.asset(
                 vehicle.imageUrl,
-                // Increased width and height from 80 to 90
-                width: 90,
-                height: 90,
+                width: 80,
+                height: 80,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                  width: 90,
-                  height: 90,
+                  width: 80,
+                  height: 80,
                   color: Colors.grey[300],
-                  child: const Icon(
-                    Icons.directions_car,
-                    color: Colors.grey,
-                    size: 45,
-                  ),
+                  child: const Icon(Icons.directions_car, color: Colors.grey),
                 ),
               ),
             ),
-            // Increased space after the image
-            const SizedBox(width: 20.0),
+            const SizedBox(width: 15.0),
 
-            // Vehicle Details (Model, License, Chassis/ID)
+            // Vehicle Details (Right side)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Vehicle Model Name (Increased font size)
+                  // Model Title (e.g., Honda Civic)
                   Text(
                     vehicle.model,
                     style: const TextStyle(
-                      // Increased font size from 18 to 20
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 10.0), // Increased vertical space
-                  // 1. License Plate Row
+                  const SizedBox(height: 8.0),
+
+                  // Plate Number and Mileage Info
                   Row(
                     children: [
-                      // Increased icon size from 15 to 18
-                      const Icon(
-                        Icons.local_shipping,
-                        size: 18,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 6), // Increased horizontal space
+                      const Icon(Icons.numbers, size: 16, color: Colors.blue),
+                      const SizedBox(width: 4),
                       Text(
-                        vehicle.licensePlate,
-                        // Increased font size from 14 to 16
+                        vehicle.plateNumber,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           color: Colors.black87,
                         ),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(
-                    height: 6.0,
-                  ), // Increased vertical space between the lines
-                  // 2. Chassis/Odometer Row
-                  Row(
-                    children: [
-                      // Increased icon size from 15 to 18
-                      const Icon(
-                        Icons.headset,
-                        size: 18,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 6), // Increased horizontal space
+                      const SizedBox(width: 15),
+                      const Icon(Icons.speed, size: 16, color: Colors.blue),
+                      const SizedBox(width: 4),
                       Text(
-                        vehicle.chassisNumber,
-                        // Increased font size from 14 to 16
+                        vehicle.mileage.toString(),
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           color: Colors.black87,
                         ),
                       ),
