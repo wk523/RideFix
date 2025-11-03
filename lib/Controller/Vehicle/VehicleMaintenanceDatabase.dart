@@ -260,7 +260,7 @@ class VehicleDataService {
   // -------------------------
   // Update Vehicle (with optional new image)
   // -------------------------
-  Future<void> updateVehicle(
+  Future<String?> updateVehicle(
     Vehicle updatedVehicle, {
     Uint8List? newImageBytes,
   }) async {
@@ -271,14 +271,12 @@ class VehicleDataService {
 
       String finalImageUrl = updatedVehicle.imageUrl;
 
-      // ✅ If new image selected
+      // ✅ Upload new image (and delete old one)
       if (newImageBytes != null) {
-        // Delete old one first (if any)
         if (updatedVehicle.imageUrl.isNotEmpty) {
           await deleteVehicleImage(updatedVehicle.imageUrl);
         }
 
-        // Upload new one
         final uploadedUrl = await uploadVehicleImageFromBytes(
           newImageBytes,
           updatedVehicle.plateNumber,
@@ -291,10 +289,9 @@ class VehicleDataService {
         }
       }
 
-      // ✅ Create a copy of vehicle with new URL
+      // ✅ Update Firestore with final image URL
       final updatedMap = updatedVehicle.toMap()..['imageUrl'] = finalImageUrl;
 
-      // ✅ Validate before saving
       final error = validateVehicleData(updatedVehicle);
       if (error != null) throw Exception(error);
 
@@ -304,6 +301,7 @@ class VehicleDataService {
           .update(updatedMap);
 
       print('✅ Vehicle updated successfully in Firestore.');
+      return finalImageUrl; // ✅ return new URL so UI can refresh preview
     } catch (e) {
       print('❌ Error updating vehicle: $e');
       rethrow;

@@ -1,10 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
 const supabaseUrl = 'https://jxcmwksfbyqeiyrxcada.supabase.co';
 const supabaseKey =
@@ -41,9 +39,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // Set the VehicleListScreen as the home screen
-      // home: VehicleDetailsPage(details: mockDetails),
-      home: VehicleListPage(),
+      // home: VehicleListPage(),
+      home: AddServiceRecordPage(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }

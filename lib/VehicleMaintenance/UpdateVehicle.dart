@@ -96,15 +96,26 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
         imageUrl: oldImageUrl ?? '',
       );
 
-      await _vehicleService.updateVehicle(
+      // ✅ Update vehicle and get new URL if image changed
+      final newUrl = await _vehicleService.updateVehicle(
         updatedVehicle,
         newImageBytes: newImageBytes,
       );
 
+      // ✅ Refresh local state immediately
       if (mounted) {
+        setState(() {
+          if (newUrl != null) {
+            previewUrl = newUrl;
+            oldImageUrl = newUrl;
+            newImageBytes = null;
+          }
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Vehicle updated successfully')),
         );
+
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -269,32 +280,31 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     if (newImageBytes != null) {
       return Image.memory(
         newImageBytes!,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         width: double.infinity,
       );
     } else if (previewUrl != null && previewUrl!.isNotEmpty) {
       return Image.network(
         previewUrl!,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         width: double.infinity,
         loadingBuilder: (context, child, progress) => progress == null
             ? child
             : const Center(child: CircularProgressIndicator()),
-        errorBuilder: (context, error, stack) => Container(
-          color: Colors.grey[300],
-          child: const Center(
-            child: Icon(Icons.directions_car, color: Colors.grey, size: 60),
-          ),
-        ),
+        errorBuilder: (context, error, stack) => _placeholderImage(),
       );
     } else {
-      return Container(
-        color: Colors.grey[300],
-        child: const Center(
-          child: Icon(Icons.camera_alt, color: Colors.grey, size: 50),
-        ),
-      );
+      return _placeholderImage();
     }
+  }
+
+  Widget _placeholderImage() {
+    return Container(
+      color: Colors.grey[300],
+      child: const Center(
+        child: Icon(Icons.directions_car, color: Colors.grey, size: 60),
+      ),
+    );
   }
 
   Widget _buildInputContainer(List<Widget> children) {

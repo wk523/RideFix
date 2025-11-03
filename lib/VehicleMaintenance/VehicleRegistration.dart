@@ -54,36 +54,33 @@ class _VehicleRegistrationPageState extends State<VehicleRegistrationPage> {
                 if (bytes != null) {
                   setState(() {
                     _pickedImageBytes = bytes;
-                    _pickedImagePreviewPlate = plateController.text
-                        .trim()
-                        .toUpperCase();
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Image selected — it will be uploaded when you register.',
-                      ),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No image selected.')),
+                    const SnackBar(content: Text('✅ Image selected')),
                   );
                 }
               },
-              child: CircleAvatar(
-                radius: 55,
-                backgroundColor: Colors.grey.shade300,
-                backgroundImage: _pickedImageBytes != null
-                    ? MemoryImage(_pickedImageBytes!)
-                    : null,
-                child: _pickedImageBytes == null
-                    ? Icon(
-                        Icons.camera_alt,
-                        size: 40,
-                        color: Colors.grey.shade700,
-                      )
-                    : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _pickedImageBytes != null
+                      ? Image.memory(
+                          _pickedImageBytes!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        )
+                      : Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Icon(
+                              Icons.camera_alt,
+                              color: Colors.grey,
+                              size: 50,
+                            ),
+                          ),
+                        ),
+                ),
               ),
             ),
           ),
