@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:async/async.dart';
 
 class ServiceRecordDatabase {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,7 +12,7 @@ class ServiceRecordDatabase {
     try {
       final fileName = 'service_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      final res = await Supabase.instance.client.storage
+      await Supabase.instance.client.storage
           .from('service_images')
           .uploadBinary(
             fileName,
@@ -31,6 +33,7 @@ class ServiceRecordDatabase {
   }
 
   /// ✅ Add a new service record under the selected category
+  /// ✅ Add a new service record (flat structure)
   Future<void> addServiceRecord({
     required String userId,
     required String vehicleId,
@@ -54,92 +57,96 @@ class ServiceRecordDatabase {
       };
 
       if (extraData != null) {
-        data.addAll(extraData); // ✅ safe merge
+        data.addAll(extraData);
       }
 
-      await _firestore
-          .collection('ServiceRecord')
-          .doc(category)
-          .collection('records')
-          .add(data);
-
-      print("✅ Service record added successfully under category: $category");
+      await _firestore.collection('ServiceRecord').add(data);
+      print("✅ Added record (flat structure) under category: $category");
     } catch (e) {
-      print("❌ Error adding service record: $e");
+      print("❌ Error adding record: $e");
       rethrow;
     }
   }
 
-  /// ✅ Fetch all service records for a specific category
-  Future<List<Map<String, dynamic>>> fetchServiceRecordsByCategory({
+  /// 🔥 REAL-TIME: Stream of records for a single category
+  Stream<List<Map<String, dynamic>>> streamServiceRecordsByCategory({
+    required String userId,
     required String category,
-  }) async {
-    try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('ServiceRecord')
-          .doc(category)
-          .collection('records')
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
-          .toList();
-    } catch (e) {
-      print("❌ Error fetching records: $e");
-      return [];
-    }
+  }) {
+    return _firestore
+        .collection('ServiceRecord')
+        .where('userId', isEqualTo: userId)
+        .where('category', isEqualTo: category)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
   }
 
-  /// ✅ Fetch all service records (from all categories)
-  Future<List<Map<String, dynamic>>> fetchAllServiceRecords() async {
-    try {
-      List<Map<String, dynamic>> allRecords = [];
+  /// 🔍 Get Firestore query stream with filters: category, date range, sort
+  Stream<List<Map<String, dynamic>>> streamFilteredServiceRecords({
+    required String userId,
+    String? category,
+    DateTimeRange? dateRange,
+    String sortBy = 'Date',
+  }) {
+    Query query = _firestore
+        .collection('ServiceRecord')
+        .where('userId', isEqualTo: userId);
 
-      final categories = await _firestore.collection('ServiceRecord').get();
-
-      for (var catDoc in categories.docs) {
-        final categoryName = catDoc.id;
-        final recordsSnapshot = await _firestore
-            .collection('ServiceRecord')
-            .doc(categoryName)
-            .collection('records')
-            .orderBy('createdAt', descending: true)
-            .get();
-
-        for (var record in recordsSnapshot.docs) {
-          allRecords.add({
-            'category': categoryName,
-            'id': record.id,
-            ...record.data() as Map<String, dynamic>,
-          });
-        }
-      }
-
-      return allRecords;
-    } catch (e) {
-      print("❌ Error fetching all records: $e");
-      return [];
+    // Apply category filter
+    if (category != null && category != 'All') {
+      query = query.where('category', isEqualTo: category);
     }
+
+    // Apply date range filter
+    if (dateRange != null) {
+      query = query
+          .where('date', isGreaterThanOrEqualTo: _formatDate(dateRange.start))
+          .where('date', isLessThanOrEqualTo: _formatDate(dateRange.end));
+    }
+
+    // Apply sorting
+    if (sortBy == 'Amount') {
+      query = query.orderBy('amount', descending: true);
+    } else {
+      query = query.orderBy('date', descending: true);
+    }
+
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {'id': doc.id, ...data};
+      }).toList();
+    });
+  }
+
+  /// 🧠 Helper: Format date to match Firestore format
+  String _formatDate(DateTime date) {
+    return "${date.year.toString().padLeft(4, '0')}-"
+        "${date.month.toString().padLeft(2, '0')}-"
+        "${date.day.toString().padLeft(2, '0')}";
+  }
+
+  /// 🔥 REAL-TIME: Stream of all service records (merged from all categories)
+  Stream<List<Map<String, dynamic>>> streamAllServiceRecords(String userId) {
+    return _firestore
+        .collection('ServiceRecord')
+        .where('userId', isEqualTo: userId)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
   }
 
   /// ✅ Delete a specific service record
-  Future<void> deleteServiceRecord({
-    required String category,
-    required String recordId,
-  }) async {
-    try {
-      await _firestore
-          .collection('ServiceRecord')
-          .doc(category)
-          .collection('records')
-          .doc(recordId)
-          .delete();
-
-      print("🗑️ Service record deleted successfully from $category");
-    } catch (e) {
-      print("❌ Error deleting record: $e");
-      rethrow;
-    }
+  Future<void> deleteServiceRecord(String recordId) async {
+    await _firestore.collection('ServiceRecord').doc(recordId).delete();
   }
 }

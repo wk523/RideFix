@@ -40,6 +40,7 @@ dependencies:
   image_picker: ^1.2.0
   supabase_flutter: ^2.10.3
   intl: ^0.20.2
+  async: ^2.13.0
 
 dev_dependencies:
   flutter_test:

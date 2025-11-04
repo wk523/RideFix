@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/ServiceRecord/ServiceRecord.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 
@@ -39,8 +40,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // home: VehicleListPage(),
-      home: AddServiceRecordPage(),
+      // home: AddServiceRecordPage(),
+      home: ServiceRecordPage(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }

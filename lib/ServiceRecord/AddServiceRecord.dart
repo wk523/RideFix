@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -192,18 +191,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       return;
     }
 
-    String category = _selectedCategory.displayName;
-    switch (category) {
-      case 'Car Wash':
-        category = 'CarWash';
-        break;
-      case 'Road Tax':
-        category = 'RoadTax';
-        break;
-      default:
-        category = category.replaceAll(' ', '');
-        break;
-    }
+    final category = _selectedCategory.displayName; // ✅ Fixed here
 
     final amount = double.tryParse(_amountController.text) ?? 0;
     final date = _selectedDate != null
@@ -226,20 +214,16 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       imgURL = await _serviceDb.uploadServiceImage(_selectedImageBytes!);
     }
 
-    // ✅ Step 1: Prepare extraData based on selected category
-    Map<String, dynamic>? extraData;
-
     try {
-      // ✅ Step 2: Pass extraData to your database function
       await _serviceDb.addServiceRecord(
         userId: userId,
         vehicleId: _selectedVehicle!.vehicleId,
-        category: category,
+        category: category, // ✅ Saves “Maintenance”, “Toll”, etc.
         amount: amount,
         date: date,
         note: _noteController.text,
         imgURL: imgURL,
-        extraData: _extraFormData, // ✅ this already has your form data
+        extraData: _extraFormData,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -269,6 +253,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       case ServiceCategory.carWash:
         return CarWashForm(onChanged: (data) => _extraFormData = data);
       default:
+        _extraFormData = null; // ✅ no extra data for simple forms
         return const SimpleExpenseForm();
     }
   }
@@ -451,9 +436,13 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
                 .map(
                   (category) => InkWell(
                     onTap: () {
-                      setState(() => _selectedCategory = category);
+                      setState(() {
+                        _selectedCategory = category;
+                        _extraFormData = {}; // ✅ clear old form data
+                      });
                       Navigator.pop(context);
                     },
+
                     child: Column(
                       children: [
                         Container(
