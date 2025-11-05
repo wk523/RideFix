@@ -98,217 +98,318 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
     DateTimeRange? tempDateRange = selectedDateRange;
     String? tempVehicleId = selectedVehicleId;
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
               ),
-              title: const Text(
-                'Filters',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // --- Sort ---
-                    const Text(
-                      'Sort by',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    DropdownButton<String>(
-                      value: tempSort.isEmpty ? null : tempSort,
-                      hint: const Text('Select sort option'),
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'date',
-                          child: Text('Date (Newest first)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'amount',
-                          child: Text('Amount (Highest first)'),
-                        ),
-                      ],
-                      onChanged: (val) =>
-                          setModalState(() => tempSort = val ?? ''),
-                    ),
-                    const Divider(),
-
-                    // --- Category ---
-                    const Text(
-                      'Category',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (var cat in [
-                          'Maintenance',
-                          'Toll',
-                          'Parking',
-                          'Car Wash',
-                          'Insurance',
-                          'Road Tax',
-                          'Installment',
-                          'Makeup',
-                        ])
-                          FilterChip(
-                            label: Text(cat),
-                            selected: tempCategories.contains(cat),
-                            onSelected: (v) {
-                              setModalState(() {
-                                if (v) {
-                                  tempCategories.add(cat);
-                                } else {
-                                  tempCategories.remove(cat);
-                                }
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                    const Divider(),
-
-                    // --- Date Range ---
-                    const Text(
-                      'Date Range',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.calendar_month),
-                      label: Text(
-                        tempDateRange == null
-                            ? 'Select Range'
-                            : '${DateFormat('MMM d').format(tempDateRange!.start)} → ${DateFormat('MMM d, yyyy').format(tempDateRange!.end)}',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      onPressed: () async {
-                        final now = DateTime.now();
-                        final picked = await showDateRangePicker(
-                          context: context,
-                          initialDateRange:
-                              tempDateRange ??
-                              DateTimeRange(
-                                start: now.subtract(const Duration(days: 7)),
-                                end: now,
-                              ),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                useMaterial3: false, // Keep old layout
-                                colorScheme: const ColorScheme.light(
-                                  primary: Colors.blue,
-                                  onPrimary: Colors.white,
-                                  onSurface: Colors.black,
-                                ),
-                              ),
-                              child: child!,
-                            );
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Center(
+                    child: Text(
+                      "Filter Service Records",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Sort Section
+                  _sectionHeader(Icons.sort, "Sort by"),
+                  DropdownButtonFormField<String>(
+                    value: tempSort.isEmpty ? null : tempSort,
+                    hint: const Text('Select sort option'),
+                    decoration: _dropdownDecoration(),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'date',
+                        child: Text('Date (Newest first)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'amount',
+                        child: Text('Amount (Highest first)'),
+                      ),
+                    ],
+                    onChanged: (val) =>
+                        setModalState(() => tempSort = val ?? ''),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Category Section
+                  _sectionHeader(Icons.category, "Category"),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (var cat in [
+                        'Maintenance',
+                        'Toll',
+                        'Parking',
+                        'Car Wash',
+                        'Insurance',
+                        'Road Tax',
+                        'Installment',
+                        'Makeup',
+                      ])
+                        FilterChip(
+                          label: Text(cat),
+                          labelStyle: TextStyle(
+                            color: tempCategories.contains(cat)
+                                ? Colors.white
+                                : Colors.black,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          selected: tempCategories.contains(cat),
+                          selectedColor: Colors.blue.shade600,
+                          backgroundColor: Colors.grey[200],
+                          onSelected: (v) {
+                            setModalState(() {
+                              if (v) {
+                                tempCategories.add(cat);
+                              } else {
+                                tempCategories.remove(cat);
+                              }
+                            });
                           },
-                        );
-                        if (picked != null)
-                          setModalState(() => tempDateRange = picked);
-                      },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Date Range
+                  // 📅 Date Range Section
+                  const Text(
+                    'Date Range',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.blue.shade50,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.blue.shade300),
+                      ),
                     ),
-                    const Divider(),
-
-                    // --- Vehicle Filter ---
-                    const Text(
-                      'Vehicle',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    icon: Icon(
+                      Icons.calendar_month,
+                      color: Colors.blue.shade700,
                     ),
-                    StreamBuilder(
-                      stream: vehicleDataService.vehiclesStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Text('No vehicles found.');
-                        }
-
-                        final vehicles = snapshot.data!;
-                        vehicleNames.clear();
-                        for (var v in vehicles) {
-                          vehicleNames[v.vehicleId] =
-                              '${v.brand} ${v.model} (${v.plateNumber})';
-                        }
-
-                        return DropdownButton<String>(
-                          value: tempVehicleId,
-                          hint: const Text('Select vehicle'),
-                          isExpanded: true,
-                          items: [
-                            const DropdownMenuItem(
-                              value: 'All',
-                              child: Text('All Vehicles'),
+                    label: Text(
+                      tempDateRange == null
+                          ? 'Select Date Range'
+                          : '${DateFormat('MMM d').format(tempDateRange!.start)} → ${DateFormat('MMM d, yyyy').format(tempDateRange!.end)}',
+                      style: TextStyle(
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        initialDateRange:
+                            tempDateRange ??
+                            DateTimeRange(
+                              start: now.subtract(const Duration(days: 7)),
+                              end: now,
                             ),
-                            ...vehicles.map(
-                              (v) => DropdownMenuItem(
-                                value: v.vehicleId,
-                                child: Text(
-                                  '${v.brand} ${v.model} (${v.plateNumber})',
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              useMaterial3: false, // ✅ Keep old layout
+                              colorScheme: ColorScheme.light(
+                                primary: Colors
+                                    .blue
+                                    .shade700, // Header & selection color
+                                onPrimary: Colors.white, // Text on header
+                                onSurface: Colors.black87, // Calendar text
+                                surface: Colors.white,
+                              ),
+                              dialogBackgroundColor: Colors.white,
+                              textButtonTheme: TextButtonThemeData(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.blue.shade700,
+                                  textStyle: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
-                          ],
-                          onChanged: (val) =>
-                              setModalState(() => tempVehicleId = val),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                            child: child!,
+                          );
+                        },
+                      );
+
+                      if (picked != null) {
+                        setModalState(() => tempDateRange = picked);
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Vehicle Filter
+                  _sectionHeader(Icons.directions_car, "Vehicle"),
+                  StreamBuilder(
+                    stream: vehicleDataService.vehiclesStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Text('No vehicles found.');
+                      }
+
+                      final vehicles = snapshot.data!;
+                      vehicleNames.clear();
+                      for (var v in vehicles) {
+                        vehicleNames[v.vehicleId] =
+                            '${v.brand} ${v.model} (${v.plateNumber})';
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        value: tempVehicleId,
+                        hint: const Text('Select vehicle'),
+                        decoration: _dropdownDecoration(),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'All',
+                            child: Text('All Vehicles'),
+                          ),
+                          ...vehicles.map(
+                            (v) => DropdownMenuItem(
+                              value: v.vehicleId,
+                              child: Text(
+                                '${v.brand} ${v.model} (${v.plateNumber})',
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) =>
+                            setModalState(() => tempVehicleId = val),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.refresh, color: Colors.red),
+                        label: const Text(
+                          "Reset",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onPressed: () {
+                          setModalState(() {
+                            tempSort = '';
+                            tempCategories.clear();
+                            tempDateRange = null;
+                            tempVehicleId = null;
+                          });
+                        },
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                        ),
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text(
+                          "Apply",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            selectedSort = tempSort;
+                            selectedCategories = tempCategories;
+                            selectedDateRange = tempDateRange;
+                            selectedVehicleId = tempVehicleId;
+                          });
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    setModalState(() {
-                      tempSort = '';
-                      tempCategories.clear();
-                      tempDateRange = null;
-                      tempVehicleId = null;
-                    });
-                  },
-                  child: const Text(
-                    'Reset',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      selectedSort = tempSort;
-                      selectedCategories = tempCategories;
-                      selectedDateRange = tempDateRange;
-                      selectedVehicleId = tempVehicleId;
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Apply',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         );
       },
+    );
+  }
+
+  InputDecoration _dropdownDecoration() {
+    return InputDecoration(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  Widget _sectionHeader(IconData icon, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.blue.shade600, size: 20),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+        ],
+      ),
     );
   }
 
@@ -453,6 +554,10 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                                 ) ??
                                 0.0;
 
+                            final formattedAmount = amountNum.toStringAsFixed(
+                              2,
+                            );
+
                             return InkWell(
                               onTap: () {
                                 Navigator.push(
@@ -521,7 +626,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                                           left: 12.0,
                                         ),
                                         child: Text(
-                                          'RM ${(record['amount'] ?? 0).toString()}',
+                                          'RM$formattedAmount',
                                           style: const TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.bold,

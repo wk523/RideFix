@@ -154,6 +154,15 @@ class VehicleDataService {
   }
 
   // -------------------------
+  // Update Vehicle Mileage
+  // -------------------------
+  Future<void> updateVehicleMileage(String vehicleId, double newMileage) async {
+    await _firestore.collection('Vehicle').doc(vehicleId).update({
+      'mileage': newMileage,
+    });
+  }
+
+  // -------------------------
   // Register vehicle in Firestore
   // -------------------------
   Future<void> registerVehicle(Vehicle vehicle) async {

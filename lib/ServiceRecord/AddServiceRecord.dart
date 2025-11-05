@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,43 +90,31 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
 
   Uint8List? _selectedImageBytes;
   String? _uploadedImageUrl;
-  Map<String, dynamic>? _extraFormData;
+  Map<String, dynamic> _extraFormData = {};
+
+  DateTime? _selectedDate;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     _loadVehicles();
+    _selectedDate = DateTime.now();
+    _dateController.text = DateFormat('dd/MM/yyyy').format(_selectedDate!);
   }
 
   Future<void> _loadVehicles() async {
     final list = await _vehicleService.readVehicleData();
-    setState(() {
-      _vehicleList = list;
-    });
+    setState(() => _vehicleList = list);
   }
 
-  DateTime? _selectedDate;
-
   Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
-
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -133,7 +123,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
     }
   }
 
-  /// ✅ Pick or take photo
+  /// ✅ Image picker modal
   Future<void> _pickOrCaptureImage() async {
     final ImagePicker picker = ImagePicker();
 
@@ -142,275 +132,42 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Upload from Gallery'),
-                onTap: () async {
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                  );
-                  if (image != null) {
-                    final bytes = await image.readAsBytes();
-                    setState(() => _selectedImageBytes = bytes);
-                  }
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Take a Photo'),
-                onTap: () async {
-                  final XFile? photo = await picker.pickImage(
-                    source: ImageSource.camera,
-                  );
-                  if (photo != null) {
-                    final bytes = await photo.readAsBytes();
-                    setState(() => _selectedImageBytes = bytes);
-                  }
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _saveRecord() async {
-    const userId = 'weikit523';
-
-    if (_selectedVehicle == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a vehicle')));
-      return;
-    }
-
-    final category = _selectedCategory.displayName; // ✅ Fixed here
-
-    final amount = double.tryParse(_amountController.text) ?? 0;
-    final date = _selectedDate != null
-        ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-        : '';
-
-    if (category.isEmpty || amount == 0 || date.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '⚠️ Please enter a valid amount greater than 0 and fill all required fields.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    String? imgURL;
-    if (_selectedImageBytes != null) {
-      imgURL = await _serviceDb.uploadServiceImage(_selectedImageBytes!);
-    }
-
-    try {
-      await _serviceDb.addServiceRecord(
-        userId: userId,
-        vehicleId: _selectedVehicle!.vehicleId,
-        category: category, // ✅ Saves “Maintenance”, “Toll”, etc.
-        amount: amount,
-        date: date,
-        note: _noteController.text,
-        imgURL: imgURL,
-        extraData: _extraFormData,
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Service record saved successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
-    }
-  }
-
-  /// ✅ Dynamic category form builder
-  Widget _buildCategoryForm() {
-    switch (_selectedCategory) {
-      case ServiceCategory.maintenance:
-        return MaintenanceForm(onChanged: (data) => _extraFormData = data);
-      case ServiceCategory.roadTax:
-        return RoadTaxForm(onChanged: (data) => _extraFormData = data);
-      case ServiceCategory.insurance:
-        return InsuranceForm(onChanged: (data) => _extraFormData = data);
-      case ServiceCategory.carWash:
-        return CarWashForm(onChanged: (data) => _extraFormData = data);
-      default:
-        _extraFormData = null; // ✅ no extra data for simple forms
-        return const SimpleExpenseForm();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Add Service Record')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      builder: (_) => SafeArea(
+        child: Wrap(
           children: [
-            DropdownButtonFormField<Vehicle>(
-              value: _selectedVehicle,
-              decoration: InputDecoration(
-                labelText: 'Select Vehicle',
-                labelStyle: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.directions_car, color: Colors.grey[600]),
-              ),
-              items: _vehicleList.map((v) {
-                return DropdownMenuItem<Vehicle>(
-                  value: v,
-                  child: Text('${v.brand} ${v.model} (${v.plateNumber})'),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Upload from Gallery'),
+              onTap: () async {
+                final XFile? image = await picker.pickImage(
+                  source: ImageSource.gallery,
                 );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedVehicle = value),
+                if (image != null) {
+                  final bytes = await image
+                      .readAsBytes(); // ✅ wait outside setState
+                  setState(() {
+                    _selectedImageBytes = bytes;
+                  });
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
             ),
-            const SizedBox(height: 24),
-
-            // ✅ Category
-            GestureDetector(
-              onTap: () => _showCategorySelectionModal(),
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: 'CATEGORY',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: Icon(
-                    _selectedCategory.icon,
-                    color: Colors.grey[600],
-                  ),
-                  suffixIcon: const Icon(Icons.arrow_forward_ios, size: 16),
-                ),
-                child: Text(_selectedCategory.displayName),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ✅ Show dynamic form
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _buildCategoryForm(),
-            ),
-            const SizedBox(height: 24),
-
-            // ✅ Amount
-            TextFormField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: 'AMOUNT',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixText: 'RM ',
-                prefixStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                  RegExp(r'^\d*\.?\d{0,2}'),
-                ), // ✅ only numbers + up to 2 decimals
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // ✅ Date Picker
-            TextFormField(
-              controller: _dateController,
-              readOnly: true,
-              decoration: InputDecoration(
-                labelText: 'Date',
-                hintText: 'Select Date',
-                prefixIcon: const Icon(
-                  Icons.calendar_today,
-                  color: Colors.blue,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onTap: _pickDate,
-            ),
-            const SizedBox(height: 16),
-
-            // ✅ Add Photo
-            OutlinedButton.icon(
-              onPressed: _pickOrCaptureImage,
-              icon: const Icon(Icons.camera_alt),
-              label: Text(
-                _selectedImageBytes == null ? 'Add Photo' : 'Change Photo',
-              ),
-            ),
-            if (_selectedImageBytes != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Image.memory(
-                      _selectedImageBytes!,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 40),
-
-            ElevatedButton(
-              onPressed: _saveRecord,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Done', style: TextStyle(fontSize: 18)),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () async {
+                final XFile? photo = await picker.pickImage(
+                  source: ImageSource.camera,
+                );
+                if (photo != null) {
+                  final bytes = await photo
+                      .readAsBytes(); // ✅ wait outside setState
+                  setState(() {
+                    _selectedImageBytes = bytes;
+                  });
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
             ),
           ],
         ),
@@ -418,59 +175,324 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
     );
   }
 
-  // --- Category Selection Modal ---
+  Future<void> _saveRecord() async {
+    const userId = 'weikit523';
+    if (_selectedVehicle == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a vehicle')));
+      return;
+    }
+
+    final category = _selectedCategory.displayName;
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final date = _selectedDate != null
+        ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+        : '';
+
+    if (category == 'Select Category' || amount <= 0 || date.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Please complete all required fields.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      // ✅ 1. Handle image upload (optional)
+      String? imgURL;
+      if (_selectedImageBytes != null) {
+        imgURL = await _serviceDb.uploadServiceImage(_selectedImageBytes!);
+      }
+
+      // ✅ 2. Handle mileage validation + update (only for maintenance)
+      if (_extraFormData.containsKey('mileage')) {
+        final enteredMileageText = _extraFormData['mileage']?.toString().trim();
+        final currentMileage = double.tryParse(
+          _selectedVehicle?.mileage ?? '0',
+        );
+
+        if (enteredMileageText != null && enteredMileageText.isNotEmpty) {
+          final enteredMileage = double.tryParse(enteredMileageText);
+
+          if (enteredMileage != null && currentMileage != null) {
+            if (enteredMileage < currentMileage) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    '⚠️ Mileage cannot be lower than current vehicle mileage.',
+                  ),
+                ),
+              );
+              setState(() => _isSaving = false);
+              return;
+            } else if (enteredMileage > currentMileage) {
+              await VehicleDataService().updateVehicleMileage(
+                _selectedVehicle!.vehicleId,
+                enteredMileage,
+              );
+            }
+          }
+        }
+      }
+
+      // ✅ 3. Save service record
+      await _serviceDb.addServiceRecord(
+        userId: userId,
+        vehicleId: _selectedVehicle!.vehicleId,
+        category: category,
+        amount: amount,
+        date: date,
+        note: _noteController.text.trim(),
+        imgURL: imgURL,
+        extraData: _extraFormData.isEmpty ? null : _extraFormData,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Service record saved successfully!')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  Widget _buildCategoryForm() {
+    switch (_selectedCategory) {
+      case ServiceCategory.maintenance:
+        return MaintenanceForm(
+          onChanged: (data) => _extraFormData = data,
+          initialMileage: _selectedVehicle?.mileage?.toString(),
+        );
+
+      case ServiceCategory.roadTax:
+        return RoadTaxForm(onChanged: (data) => _extraFormData = data);
+      case ServiceCategory.insurance:
+        return InsuranceForm(onChanged: (data) => _extraFormData = data);
+      case ServiceCategory.carWash:
+        return CarWashForm(onChanged: (data) => _extraFormData = data);
+      default:
+        return SimpleExpenseForm(controller: _noteController);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(title: const Text('Add Service Record')),
+          body: Column(
+            children: [
+              // Scrollable content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      /// Vehicle dropdown
+                      DropdownButtonFormField<Vehicle>(
+                        value: _selectedVehicle,
+                        decoration: const InputDecoration(
+                          labelText: 'Select Vehicle',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _vehicleList.map((v) {
+                          return DropdownMenuItem(
+                            value: v,
+                            child: Text(
+                              '${v.brand} ${v.model} (${v.plateNumber})',
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) =>
+                            setState(() => _selectedVehicle = value),
+                      ),
+                      const SizedBox(height: 20),
+
+                      /// Category
+                      GestureDetector(
+                        onTap: _showCategorySelectionModal,
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            border: OutlineInputBorder(),
+                            suffixIcon: Icon(Icons.arrow_drop_down),
+                          ),
+                          child: Text(_selectedCategory.displayName),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      /// Dynamic form
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: _buildCategoryForm(),
+                      ),
+                      const SizedBox(height: 16),
+
+                      /// Amount
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount (RM)',
+                          border: OutlineInputBorder(),
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      /// Date
+                      TextFormField(
+                        controller: _dateController,
+                        readOnly: true,
+                        onTap: _pickDate,
+                        decoration: const InputDecoration(
+                          labelText: 'Date',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      /// Add Photo
+                      OutlinedButton.icon(
+                        onPressed: _pickOrCaptureImage,
+                        icon: const Icon(Icons.camera_alt),
+                        label: Text(
+                          _selectedImageBytes == null
+                              ? 'Add Photo'
+                              : 'Change Photo',
+                        ),
+                      ),
+                      if (_selectedImageBytes != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: FutureBuilder<ui.Image>(
+                              future: decodeImageFromList(_selectedImageBytes!),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const SizedBox(
+                                    height: 180,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                final image = snapshot.data!;
+                                final aspectRatio = image.width / image.height;
+                                return AspectRatio(
+                                  aspectRatio: aspectRatio,
+                                  child: Image.memory(
+                                    _selectedImageBytes!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Fixed Save button
+              SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveRecord,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: Colors.blue,
+                    ),
+                    child: const Text(
+                      'Save Record',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        /// Loading overlay
+        if (_isSaving)
+          Container(
+            color: Colors.black26,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+      ],
+    );
+  }
+
   void _showCategorySelectionModal() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          child: GridView.count(
-            shrinkWrap: true,
-            crossAxisCount: 4,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            children: ServiceCategory.values
-                .where((cat) => cat != ServiceCategory.none)
-                .map(
-                  (category) => InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = category;
-                        _extraFormData = {}; // ✅ clear old form data
-                      });
-                      Navigator.pop(context);
-                    },
-
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            category.icon,
-                            size: 30,
-                            color: Colors.blue,
-                          ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SizedBox(
+        height: 230, // <-- limit modal height
+        child: GridView.count(
+          padding: const EdgeInsets.all(16),
+          crossAxisCount: 4,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          children: ServiceCategory.values
+              .where((c) => c != ServiceCategory.none)
+              .map(
+                (category) => InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedCategory = category;
+                      _extraFormData = {};
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          category.displayName,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
+                        child: Icon(category.icon, color: Colors.blue),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(category.displayName, textAlign: TextAlign.center),
+                    ],
                   ),
-                )
-                .toList(),
-          ),
-        );
-      },
+                ),
+              )
+              .toList(),
+        ),
+      ),
     );
   }
 }
@@ -478,7 +500,8 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
 /// --- Specific Form Components ---
 
 class SimpleExpenseForm extends StatelessWidget {
-  const SimpleExpenseForm({super.key});
+  final TextEditingController controller;
+  const SimpleExpenseForm({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -492,6 +515,7 @@ class SimpleExpenseForm extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           decoration: InputDecoration(
             hintText: 'e.g., Highway toll from KL to Penang',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -505,7 +529,12 @@ class SimpleExpenseForm extends StatelessWidget {
 
 class MaintenanceForm extends StatefulWidget {
   final Function(Map<String, dynamic>) onChanged;
-  const MaintenanceForm({super.key, required this.onChanged});
+  final String? initialMileage;
+  const MaintenanceForm({
+    super.key,
+    required this.onChanged,
+    this.initialMileage,
+  });
 
   @override
   State<MaintenanceForm> createState() => _MaintenanceFormState();
@@ -521,7 +550,7 @@ class _MaintenanceFormState extends State<MaintenanceForm> {
   @override
   void initState() {
     super.initState();
-    // Listen to text changes and call the callback
+    _mileageController.text = widget.initialMileage ?? ''; // 👈 preload mileage
     _serviceProviderController.addListener(_notifyParent);
     _mileageController.addListener(_notifyParent);
     _performedServiceController.addListener(_notifyParent);
@@ -565,12 +594,24 @@ class _MaintenanceFormState extends State<MaintenanceForm> {
         TextFormField(
           controller: _mileageController,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+
           decoration: InputDecoration(
             labelText: 'Current Mileage',
+            hintText: widget.initialMileage != null
+                ? 'Current: ${widget.initialMileage} km'
+                : 'Enter mileage',
             suffixText: 'km',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          onTap: () {
+            // Optionally clear only when tapped (if you had a default value before)
+            if (_mileageController.text == widget.initialMileage) {
+              _mileageController.clear();
+            }
+          },
         ),
+
         const SizedBox(height: 16),
         TextFormField(
           controller: _performedServiceController,
