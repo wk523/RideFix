@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:async/async.dart';
 
 class ServiceRecordDatabase {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
