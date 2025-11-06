@@ -1,5 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+
+// Import RideFX onboarding and login pages
+import 'package:ridefix/screen/auth/welcome_screen.dart';
+import 'package:ridefix/screen/auth/login_screen.dart';
+import 'package:ridefix/screen/profile/profile_screen.dart';
+import 'package:ridefix/screen/auth/register_screen.dart';
+// Import vehicle maintenance modules
 import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
@@ -14,34 +21,38 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // The "Vehicle List" title that appears in the app switcher
-      title: 'FYP Vehicle App',
+      title: 'RideFX App',
 
-      // Define the primary theme color
+      debugShowCheckedModeBanner: false,
+
       theme: ThemeData(
-        // Set the primary color to a shade of blue for the App Bar
         primarySwatch: Colors.blue,
-        // This makes the AppBar look exactly like the screenshot's header
+        scaffoldBackgroundColor: Colors.white,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.blue,
           elevation: 0,
         ),
-        // Set a light grey background to mimic the screenshot's surrounding color
-        scaffoldBackgroundColor: Colors.grey[200],
         useMaterial3: true,
       ),
 
-      // Set the VehicleListScreen as the home screen
-      // home: VehicleDetailsPage(details: mockDetails),
-      home: VehicleListPage(),
-      debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
+
+      home: const WelcomeScreen(),
+
+
+      routes: {
+
+        '/login': (context) => const LoginScreen(),
+        '/vehicleList': (context) => VehicleListPage(),
+        '/vehicleRegister': (context) => VehicleRegistrationPage(),
+        //'/vehicleDetails': (context) => VehicleDetailsPage(),
+        '/updateVehicle': (context) => UpdateVehiclePage(),
+        '/profile': (context) =>  ProfileScreen(),
+        '/register': (context) => const RegisterScreen(),
+
+      },
     );
   }
 }
-
-// NOTE: Ensure your 'vehiclelist.dart' file contains the
-// VehicleListScreen, Vehicle, and mockVehicles classes.
