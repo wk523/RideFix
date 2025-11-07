@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/Expenses&Analytics/ExpensesAnalytics.dart';
+import 'package:ridefix/HomePage.dart';
 import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 import 'package:ridefix/ServiceRecord/ServiceRecord.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -42,7 +43,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // home: AddServiceRecordPage(),
-      home: ServiceRecordPage(),
+      home: CarCareApp(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }
