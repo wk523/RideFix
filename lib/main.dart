@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // home: AddServiceRecordPage(),
-      home: ExpensesAnalyticsPage(),
+      home: ServiceRecordPage(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }
