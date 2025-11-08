@@ -1,0 +1,87 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+
+class ExpensesAnalyticsDatabase {
+  final CollectionReference _records = FirebaseFirestore.instance.collection('ServiceRecord');
+
+  /// Returns a map with:
+  /// {
+  ///   'total': double,
+  ///   'monthlyTotals': { 'YYYY-MM': double, ... },
+  ///   'monthlyAverage': double,
+  ///   'tco': double // 6-month projection (simple)
+  /// }
+  Future<Map<String, dynamic>> fetchExpenseSummary({required String userId}) async {
+    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+
+    double total = 0.0;
+    final Map<String, double> monthlyTotals = {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      // amount may be num or string
+      final raw = data['amount'];
+      final double amount = _parseDouble(raw);
+
+      total += amount;
+
+      // date expected 'yyyy-MM-dd' string; fallback to timestamp
+      String key = 'unknown';
+      final dateRaw = data['date'];
+      if (dateRaw is String && dateRaw.isNotEmpty) {
+        try {
+          final d = DateFormat('yyyy-MM-dd').parse(dateRaw);
+          key = DateFormat('yyyy-MM').format(d); // group by month
+        } catch (_) {
+          // ignore parse error
+          key = dateRaw.toString();
+        }
+      } else if (data['createdAt'] is Timestamp) {
+        final d = (data['createdAt'] as Timestamp).toDate();
+        key = DateFormat('yyyy-MM').format(d);
+      } else if (data['date'] is Timestamp) {
+        final d = (data['date'] as Timestamp).toDate();
+        key = DateFormat('yyyy-MM').format(d);
+      }
+
+      monthlyTotals[key] = (monthlyTotals[key] ?? 0.0) + amount;
+    }
+
+    // compute monthlyAverage — average across months we have
+    double monthlyAverage = 0.0;
+    if (monthlyTotals.isNotEmpty) {
+      monthlyAverage = monthlyTotals.values.fold(0.0, (a, b) => a + b) / monthlyTotals.length;
+    }
+
+    // simple TCO: project next 6 months based on monthlyAverage * 6
+    final tco = monthlyAverage * 6;
+
+    return {
+      'total': total,
+      'monthlyTotals': monthlyTotals,
+      'monthlyAverage': monthlyAverage,
+      'tco': tco,
+    };
+  }
+
+  /// Returns a Map<Category, sumAmount>
+  Future<Map<String, double>> fetchExpensesByCategory({required String userId}) async {
+    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+    final Map<String, double> map = {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final category = (data['category'] ?? 'Unknown').toString();
+      final amount = _parseDouble(data['amount']);
+      map[category] = (map[category] ?? 0.0) + amount;
+    }
+    return map;
+  }
+
+  double _parseDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    return 0.0;
+  }
+}

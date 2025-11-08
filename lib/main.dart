@@ -43,7 +43,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // home: AddServiceRecordPage(),
-      home: CarCareApp(),
+      home: ExpensesAnalyticsPage(),
       debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
     );
   }
