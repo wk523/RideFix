@@ -12,8 +12,9 @@ class ExpensesAnalyticsPage extends StatefulWidget {
 
 class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   final _db = ExpensesAnalyticsDatabase();
-  String _selectedDuration = 'YEARS'; // DAYS | MONTHS | YEARS
+  String _selectedDuration = 'YEARS'; // or 'MONTHS' or 'DAYS'
   String _currentPeriod = DateFormat('yyyy').format(DateTime.now());
+  int? _touchedGroupIndex;
   bool _isBarChart = true;
   bool showAll = false; // 👈 for controlling “Show All” toggle
 
@@ -38,38 +39,28 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   Future<void> _loadAnalyticsData() async {
     setState(() => _loading = true);
 
-    final summary = await _db.fetchExpenseSummary(userId: userId);
+    final summary = await _db.fetchExpenseSummary(
+      userId: userId,
+      duration: _selectedDuration,
+    );
     final categoryMap = await _db.fetchExpensesByCategory(userId: userId);
 
-    // ✅ Use monthlyTotals directly (already in yyyy-MM format)
-    final monthlyTotals = Map<String, double>.from(
-      summary['monthlyTotals'] ?? {},
+    // ✅ Fix: Use groupedTotals + average instead of old keys
+    final groupedTotals = Map<String, double>.from(
+      summary['groupedTotals'] ?? {},
     );
 
-    // ✅ Sort keys chronologically
-    final sortedKeys = monthlyTotals.keys.toList()
-      ..sort(
-        (a, b) => DateTime.parse('$a-01').compareTo(DateTime.parse('$b-01')),
-      );
+    final sortedKeys = groupedTotals.keys.toList()..sort();
 
     monthlyEntries = sortedKeys
-        .map((k) => MapEntry(k, monthlyTotals[k]!))
+        .map((k) => MapEntry(k, groupedTotals[k]!))
         .toList();
 
-    // ✅ Sort category data
-    topCategories =
-        categoryMap.entries
-            .map((e) => {'category': e.key, 'amount': e.value})
-            .toList()
-          ..sort(
-            (a, b) => (b['amount'] as double).compareTo(a['amount'] as double),
-          );
-
     setState(() {
-      _monthlyData = monthlyTotals;
+      _monthlyData = groupedTotals;
       _categoryData = categoryMap;
       _totalExpenses = summary['total'] ?? 0.0;
-      monthlyAverage = summary['monthlyAverage'] ?? 0.0;
+      monthlyAverage = summary['average'] ?? 0.0;
       tco = summary['tco'] ?? 0.0;
       _loading = false;
     });
@@ -111,7 +102,11 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     Widget buildDurationTab(String label) {
       final isSelected = _selectedDuration == label;
       return GestureDetector(
-        onTap: () => setState(() => _selectedDuration = label),
+        onTap: () async {
+          setState(() => _selectedDuration = label);
+          await _loadAnalyticsData(); // 👈 reload chart data
+        },
+
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -269,48 +264,86 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       );
     }
 
+    // 🧠 Determine correct X-axis order based on _selectedDuration
+    final xLabels = _selectedDuration == 'DAYS'
+        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        : _selectedDuration == 'MONTHS'
+        ? ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5']
+        : [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ];
+
+    // Ensure all labels are present
+    final Map<String, double> fullData = {
+      for (final label in xLabels)
+        label: monthlyEntries
+            .firstWhere(
+              (e) => e.key == label,
+              orElse: () => MapEntry(label, 0.0),
+            )
+            .value,
+    };
+
+    final entries = fullData.entries.toList();
+
     final maxY =
-        (monthlyEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b) *
-                1.2)
+        (entries.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 1.2)
             .ceilToDouble();
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final chartHeight = constraints.maxWidth * 0.6; // auto scale
+        final chartHeight = constraints.maxWidth * 0.6;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8.0),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
               child: Text(
-                'Monthly Expenses Overview',
-                style: TextStyle(
+                _selectedDuration == 'DAYS'
+                    ? 'Weekly Expenses Overview'
+                    : _selectedDuration == 'MONTHS'
+                    ? 'Monthly Expenses Overview'
+                    : 'Yearly Expenses Overview',
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   letterSpacing: 0.2,
                 ),
               ),
             ),
+            SizedBox(height: 16),
             SizedBox(
-              height: chartHeight.clamp(200, 350), // keep within nice range
+              height: chartHeight.clamp(200, 350),
               child: BarChart(
                 BarChartData(
                   maxY: maxY,
                   borderData: FlBorderData(show: false),
                   gridData: FlGridData(show: true, drawVerticalLine: false),
-
                   titlesData: FlTitlesData(
                     show: true,
 
-                    // Left Axis (RM values)
+                    // Left axis (RM values)
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 50,
-                        interval: maxY / 5,
+                        interval: maxY > 0
+                            ? maxY / 5
+                            : 1, // ✅ Prevent 0 interval
                         getTitlesWidget: (value, meta) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.only(right: 5),
                           child: Text(
                             'RM${value.toInt()}',
                             style: const TextStyle(
@@ -323,21 +356,21 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                       ),
                     ),
 
-                    // Bottom Axis (Months)
+                    // Bottom axis (dynamic X labels)
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          if (value < 0 || value >= monthlyEntries.length) {
+                          if (value < 0 || value >= entries.length) {
                             return const SizedBox.shrink();
                           }
-                          final label = monthlyEntries[value.toInt()].key;
+                          final label = entries[value.toInt()].key;
                           return Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
                               label,
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w500,
                                 color: Colors.black87,
                               ),
@@ -355,7 +388,8 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                     ),
                   ),
 
-                  barGroups: monthlyEntries.asMap().entries.map((entry) {
+                  // Bar data
+                  barGroups: entries.asMap().entries.map((entry) {
                     final index = entry.key;
                     final amount = entry.value.value;
 
@@ -365,7 +399,10 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                         BarChartRodData(
                           toY: amount,
                           width: 22,
-                          color: Colors.blueAccent,
+                          color: index == _touchedGroupIndex
+                              ? Colors
+                                    .blueAccent // Optional: Highlight selected bar
+                              : Colors.lightBlue,
                           borderRadius: BorderRadius.circular(6),
                           borderSide: const BorderSide(
                             color: Colors.black12,
@@ -373,23 +410,50 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                           ),
                         ),
                       ],
-                      showingTooltipIndicators: [0],
+                      showingTooltipIndicators: index == _touchedGroupIndex
+                          ? [0]
+                          : [],
                     );
                   }).toList(),
 
+                  // Tooltip config
                   barTouchData: BarTouchData(
                     enabled: true,
+                    // 2. Implement the touchCallback to handle click/tap
+                    touchCallback: (FlTouchEvent event, BarTouchResponse? response) {
+                      // Check for the *end* of a tap/click action (pointer released).
+                      if (event is FlTapUpEvent || event is FlLongPressEnd) {
+                        setState(() {
+                          if (response?.spot != null) {
+                            final newIndex =
+                                response!.spot!.touchedBarGroupIndex;
+
+                            // Toggle the selection: If tapped again, deselect; otherwise, select the new bar.
+                            _touchedGroupIndex =
+                                (newIndex == _touchedGroupIndex)
+                                ? null
+                                : newIndex;
+                          } else {
+                            // Tap occurred outside the bars, so clear the selection.
+                            _touchedGroupIndex = null;
+                          }
+                        });
+                      }
+                      // For FlTouchEvent.longPress and other events, we don't change the state.
+                    },
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final month = monthlyEntries[group.x.toInt()].key;
-                        final amount = monthlyEntries[group.x.toInt()].value;
-                        final total = monthlyEntries.fold<double>(
+                        final label = entries[group.x.toInt()].key;
+                        final amount = entries[group.x.toInt()].value;
+                        final total = entries.fold<double>(
                           0.0,
                           (sum, e) => sum + e.value,
                         );
-                        final percent = total > 0 ? (amount / total) * 100 : 0;
+                        final percent = total > 0
+                            ? (amount / total) * 100
+                            : 0.0;
                         return BarTooltipItem(
-                          '$month\nRM${amount.toStringAsFixed(2)} (${percent.toStringAsFixed(1)}%)',
+                          '$label\nRM${amount.toStringAsFixed(2)} (${percent.toStringAsFixed(1)}%)',
                           const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,

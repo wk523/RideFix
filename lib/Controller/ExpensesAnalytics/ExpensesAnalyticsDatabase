@@ -2,70 +2,122 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class ExpensesAnalyticsDatabase {
-  final CollectionReference _records = FirebaseFirestore.instance.collection('ServiceRecord');
+  final CollectionReference _records =
+      FirebaseFirestore.instance.collection('ServiceRecord');
 
-  /// Returns a map with:
-  /// {
-  ///   'total': double,
-  ///   'monthlyTotals': { 'YYYY-MM': double, ... },
-  ///   'monthlyAverage': double,
-  ///   'tco': double // 6-month projection (simple)
-  /// }
-  Future<Map<String, dynamic>> fetchExpenseSummary({required String userId}) async {
-    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+  /// Returns summary by selected duration:
+  /// 'DAYS' -> group by day
+  /// 'MONTHS' -> group by month
+  /// 'YEARS' -> group by year
+  Future<Map<String, dynamic>> fetchExpenseSummary({
+  required String userId,
+  required String duration,
+}) async {
+  final snapshot =
+      await _records.where('userId', isEqualTo: userId).get();
 
-    double total = 0.0;
-    final Map<String, double> monthlyTotals = {};
+  double total = 0.0;
+  final Map<String, double> groupedTotals = {};
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      // amount may be num or string
-      final raw = data['amount'];
-      final double amount = _parseDouble(raw);
+  final now = DateTime.now();
 
-      total += amount;
+  for (final doc in snapshot.docs) {
+    final data = doc.data() as Map<String, dynamic>;
+    final amount = _parseDouble(data['amount']);
 
-      // date expected 'yyyy-MM-dd' string; fallback to timestamp
-      String key = 'unknown';
-      final dateRaw = data['date'];
-      if (dateRaw is String && dateRaw.isNotEmpty) {
-        try {
-          final d = DateFormat('yyyy-MM-dd').parse(dateRaw);
-          key = DateFormat('yyyy-MM').format(d); // group by month
-        } catch (_) {
-          // ignore parse error
-          key = dateRaw.toString();
-        }
-      } else if (data['createdAt'] is Timestamp) {
-        final d = (data['createdAt'] as Timestamp).toDate();
-        key = DateFormat('yyyy-MM').format(d);
-      } else if (data['date'] is Timestamp) {
-        final d = (data['date'] as Timestamp).toDate();
-        key = DateFormat('yyyy-MM').format(d);
+    DateTime date;
+    final rawDate = data['date'];
+    if (rawDate is String && rawDate.isNotEmpty) {
+      try {
+        date = DateFormat('yyyy-MM-dd').parse(rawDate);
+      } catch (_) {
+        continue;
       }
-
-      monthlyTotals[key] = (monthlyTotals[key] ?? 0.0) + amount;
+    } else if (rawDate is Timestamp) {
+      date = rawDate.toDate();
+    } else {
+      continue;
     }
 
-    // compute monthlyAverage — average across months we have
-    double monthlyAverage = 0.0;
-    if (monthlyTotals.isNotEmpty) {
-      monthlyAverage = monthlyTotals.values.fold(0.0, (a, b) => a + b) / monthlyTotals.length;
+    total += amount;
+
+    late String key;
+
+    if (duration == 'DAYS') {
+      // Show current week (Mon–Sun)
+      final startOfWeek =
+          now.subtract(Duration(days: now.weekday - 1)); // Monday
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+      if (date.isBefore(startOfWeek) || date.isAfter(endOfWeek)) continue;
+
+      final weekdayName = DateFormat('E').format(date); // Mon, Tue, etc.
+      key = weekdayName;
+    } else if (duration == 'MONTHS') {
+      // Show current month, group by week number
+      if (date.year != now.year || date.month != now.month) continue;
+
+      final weekNumber = ((date.day - 1) / 7).floor() + 1;
+      key = 'Week $weekNumber';
+    } else {
+      // YEARS → show current year grouped by month
+      if (date.year != now.year) continue;
+
+      key = DateFormat('MMM').format(date); // Jan, Feb, ...
     }
 
-    // simple TCO: project next 6 months based on monthlyAverage * 6
-    final tco = monthlyAverage * 6;
-
-    return {
-      'total': total,
-      'monthlyTotals': monthlyTotals,
-      'monthlyAverage': monthlyAverage,
-      'tco': tco,
-    };
+    groupedTotals[key] = (groupedTotals[key] ?? 0) + amount;
   }
 
+  // Fill in missing periods (for empty days/weeks/months)
+  if (duration == 'DAYS') {
+    for (final d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
+      groupedTotals.putIfAbsent(d, () => 0);
+    }
+  } else if (duration == 'MONTHS') {
+    for (var i = 1; i <= 5; i++) {
+      groupedTotals.putIfAbsent('Week $i', () => 0);
+    }
+  } else {
+    for (final m in [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ]) {
+      groupedTotals.putIfAbsent(m, () => 0);
+    }
+  }
+
+  // Compute average and TCO
+  final average = groupedTotals.isEmpty
+      ? 0.0
+      : groupedTotals.values.reduce((a, b) => a + b) /
+          groupedTotals.length;
+
+  final tco = average * 6; // simple projection
+
+  return {
+    'total': total,
+    'groupedTotals': groupedTotals,
+    'average': average,
+    'tco': tco,
+  };
+}
+
+
   /// Returns a Map<Category, sumAmount>
-  Future<Map<String, double>> fetchExpensesByCategory({required String userId}) async {
+  Future<Map<String, double>> fetchExpensesByCategory({
+    required String userId,
+  }) async {
     final snapshot = await _records.where('userId', isEqualTo: userId).get();
     final Map<String, double> map = {};
 

@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 /// VEHICLE MODEL
 class Vehicle {
@@ -116,39 +117,49 @@ class VehicleDataService {
   // -------------------------
   // Upload image from bytes (called on Register)
   // -------------------------
-  /// Uploads given bytes to Supabase storage with a filename generated from plateNumber.
+  /// Uploads given bytes to Firebase storage with a filename generated from plateNumber.
   /// Returns public URL or null on failure.
   Future<String?> uploadImageFromBytes(
     Uint8List bytes,
     String plateNumber,
   ) async {
+    // Use FirebaseStorage.instance to interact with the service.
+    final FirebaseStorage storage = FirebaseStorage.instance;
+
     try {
+      // 1. Prepare Filename
       final normalizedPlate = (plateNumber.trim().isEmpty)
           ? 'UNKNOWN'
           : plateNumber.trim().toUpperCase();
       final fileName =
-          '$normalizedPlate${DateTime.now().millisecondsSinceEpoch}.jpg';
+          '$normalizedPlate-${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      // NOTE: make sure bucket 'vehicle_images' exists and your Supabase client (anon key or service key)
-      // has permission to write. If you run into RLS/403, fix bucket policy in Supabase.
-      final res = await Supabase.instance.client.storage
-          .from('vehicle_images')
-          .uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg'),
-          );
+      // 2. Define Storage Reference (Path/Location)
+      // This creates a reference pointing to: /vehicle_images/fileName.jpg
+      final storageRef = storage.ref().child('vehicle_images').child(fileName);
 
-      // uploadBinary returns empty map on success in some SDK versions;
-      // we ignore content and fetch public URL next.
-      final publicUrl = Supabase.instance.client.storage
-          .from('vehicle_images')
-          .getPublicUrl(fileName);
+      // 3. Upload the Bytes (using putData)
+      // The content type is automatically inferred or can be explicitly set via SettableMetadata
+      final uploadTask = storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
 
+      // 4. Wait for the upload to complete
+      final snapshot = await uploadTask;
+
+      // 5. Get the Public Download URL
+      final publicUrl = await snapshot.ref.getDownloadURL();
+
+      print("✅ Image uploaded to Firebase Storage. URL: $publicUrl");
       return publicUrl;
+    } on FirebaseException catch (e) {
+      // Handle Firebase-specific errors (e.g., permission denied)
+      print('❌ Firebase Storage upload failed: ${e.code} - ${e.message}');
+      return null;
     } catch (e) {
-      // Log and bubble up
-      print('❌ Upload failed: $e');
+      // Catch other general errors
+      print('❌ General upload failed: $e');
       return null;
     }
   }
@@ -216,53 +227,92 @@ class VehicleDataService {
   }
 
   // -------------------------
-  // Upload a new image to Supabase (reusable)
+  // Upload a new image to Firebase Storage (reusable)
   // -------------------------
+
+  /// Uploads raw image bytes to Firebase Storage under the 'vehicle_images' path
+  /// and returns the public download URL.
   Future<String?> uploadVehicleImageFromBytes(
     Uint8List bytes,
     String plateNumber,
   ) async {
+    // Use FirebaseStorage.instance to interact with the service.
+    final FirebaseStorage storage = FirebaseStorage.instance;
+
     try {
+      // 1. Prepare Filename
       final normalizedPlate = (plateNumber.trim().isEmpty)
           ? 'UNKNOWN'
           : plateNumber.trim().toUpperCase();
+
+      // Note: Using hyphen separator for consistency with the previous Firebase version.
       final fileName =
-          '${normalizedPlate}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          '$normalizedPlate-${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      final res = await Supabase.instance.client.storage
-          .from('vehicle_images')
-          .uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg'),
-          );
+      // 2. Define Storage Reference (Path/Location)
+      // This creates a reference pointing to: /vehicle_images/fileName.jpg
+      final storageRef = storage.ref().child('vehicle_images').child(fileName);
 
-      final publicUrl = Supabase.instance.client.storage
-          .from('vehicle_images')
-          .getPublicUrl(fileName);
+      // 3. Upload the Bytes (using putData)
+      final uploadTask = storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
 
-      print('✅ Uploaded image to Supabase: $publicUrl');
+      // 4. Wait for the upload to complete
+      final snapshot = await uploadTask;
+
+      // 5. Get the Public Download URL
+      final publicUrl = await snapshot.ref.getDownloadURL();
+
+      print("✅ Image uploaded to Firebase Storage. URL: $publicUrl");
       return publicUrl;
+    } on FirebaseException catch (e) {
+      // Handle Firebase-specific errors (e.g., permission denied)
+      print('❌ Firebase Storage upload failed: ${e.code} - ${e.message}');
+      return null;
     } catch (e) {
-      print('❌ Upload failed: $e');
+      // Catch other general errors
+      print('❌ General upload failed: $e');
       return null;
     }
   }
 
   // -------------------------
-  // Delete old image from Supabase
+  // Delete old image from Firebase Storage
   // -------------------------
+
+  /// Deletes an image from Firebase Storage using its public URL.
   Future<void> deleteVehicleImage(String? url) async {
     if (url == null || url.isEmpty) return;
+
     try {
-      final uri = Uri.parse(url);
-      final fileName = uri.pathSegments.last;
-      await Supabase.instance.client.storage.from('vehicle_images').remove([
-        fileName,
-      ]);
-      print('🗑️ Deleted old image: $fileName');
+      // Firebase Storage provides refFromURL to easily get the reference
+      // regardless of the complex URL structure.
+      final Reference storageRef = FirebaseStorage.instance.refFromURL(url);
+
+      await storageRef.delete();
+
+      print(
+        '🗑️ Deleted old image from Firebase Storage: ${storageRef.fullPath}',
+      );
+    } on FirebaseException catch (e) {
+      // If the file is not found (e.g., deleted by another client), we can safely
+      // handle the exception and stop here.
+      if (e.code == 'object-not-found') {
+        print(
+          '⚠️ Image file not found at URL (already deleted or wrong path): $url',
+        );
+      } else {
+        // Re-throw other critical exceptions
+        print(
+          '⚠️ Failed to delete old image from Firebase: ${e.code} - ${e.message}',
+        );
+        rethrow;
+      }
     } catch (e) {
-      print('⚠️ Failed to delete old image: $e');
+      print('⚠️ General failure during image deletion: $e');
+      rethrow;
     }
   }
 
@@ -360,7 +410,7 @@ class VehicleDataService {
           .doc(vehicle.vehicleId)
           .delete();
 
-      // ✅ Delete from Supabase (if image exists)
+      // ✅ Delete from Firebase (if image exists)
       await vehicleDataService.deleteVehicleImage(vehicle.imageUrl);
 
       // ✅ Show success message

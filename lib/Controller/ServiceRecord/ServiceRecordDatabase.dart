@@ -1,32 +1,49 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ServiceRecordDatabase {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// ✅ Upload image to Supabase (stored in 'service_images' bucket)
+  /// ✅ Upload image to Firebase (stored in 'service_images' bucket)
+  // Make sure to have firebase_core initialized elsewhere in your app.
+
   Future<String?> uploadServiceImage(Uint8List bytes) async {
     try {
+      // 1. Create the file name
       final fileName = 'service_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      await Supabase.instance.client.storage
-          .from('service_images')
-          .uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg'),
-          );
+      // 2. Create a reference to the file location in Firebase Storage
+      // Use the same bucket name 'service_images'
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('service_images') // Your "bucket" folder
+          .child(fileName);
 
-      final publicUrl = Supabase.instance.client.storage
-          .from('service_images')
-          .getPublicUrl(fileName);
+      // 3. Define metadata (optional but good practice for content type)
+      final metadata = SettableMetadata(contentType: 'image/jpeg');
 
-      print('✅ Uploaded image to Supabase: $publicUrl');
+      // 4. Upload the Uint8List data using putData()
+      // putData returns an UploadTask
+      final uploadTask = storageRef.putData(bytes, metadata);
+
+      // 5. Wait for the upload to complete and get the TaskSnapshot
+      final snapshot = await uploadTask;
+
+      // 6. Get the public download URL
+      final publicUrl = await snapshot.ref.getDownloadURL();
+
+      print('✅ Uploaded image to Firebase Storage: $publicUrl');
       return publicUrl;
+    } on FirebaseException catch (e) {
+      // Handle Firebase-specific errors
+      print('❌ Firebase Image upload failed: ${e.code} - ${e.message}');
+      return null;
     } catch (e) {
-      print('❌ Image upload failed: $e');
+      // Handle other errors
+      print('❌ General Image upload failed: $e');
       return null;
     }
   }
