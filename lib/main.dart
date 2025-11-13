@@ -1,20 +1,41 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:ridefix/View/auth/register_screen.dart';
+import 'package:ridefix/services/notification_service.dart';
 
 // Import RideFX onboarding and login pages
-import 'package:ridefix/screen/auth/welcome_screen.dart';
-import 'package:ridefix/screen/auth/login_screen.dart';
-import 'package:ridefix/screen/profile/profile_screen.dart';
-import 'package:ridefix/screen/auth/register_screen.dart';
+import 'View/auth/welcome_screen.dart';
+import 'package:ridefix/view/auth/login_screen.dart';
+import 'package:ridefix/view/profile/profile_screen.dart';
+
 // Import vehicle maintenance modules
 import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
+//Import troubleshooting
+import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
+import 'package:ridefix/view/troubleshoot/qna_list_view.dart';
+
+//Import Maintenance Reminder
+import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await NotificationService().initialize();
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp();
+    print('✅ Firebase initialized successfully');
+
+    // Initialize Notification Service
+    await NotificationService().initialize();
+    print('✅ Notification service initialized successfully');
+  } catch (e) {
+    print('❌ Error during initialization: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -25,9 +46,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'RideFX App',
-
       debugShowCheckedModeBanner: false,
-
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
@@ -37,21 +56,18 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-
-
       home: const WelcomeScreen(),
-
-
       routes: {
-
         '/login': (context) => const LoginScreen(),
         '/vehicleList': (context) => VehicleListPage(),
         '/vehicleRegister': (context) => VehicleRegistrationPage(),
         //'/vehicleDetails': (context) => VehicleDetailsPage(),
         '/updateVehicle': (context) => UpdateVehiclePage(),
-        '/profile': (context) =>  ProfileScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/guide': (context) => const TroubleshootingPage(),
         '/register': (context) => const RegisterScreen(),
-
+        '/qnaList': (context) => QnaListView(),
+        '/maintenance': (context) => MaintenanceMainView(),
       },
     );
   }
