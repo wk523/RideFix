@@ -13,75 +13,32 @@ class ExpensesAnalyticsPage extends StatefulWidget {
 
 class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   final _db = ExpensesAnalyticsDatabase();
-  String _selectedDuration = 'YEARS'; // or 'MONTHS' or 'DAYS'
+  String _selectedDuration = 'MONTHS';
   String _currentPeriod = DateFormat('yyyy').format(DateTime.now());
-  int? _touchedGroupIndex;
+  DateTime _currentDate = DateTime.now();
+
   bool _isBarChart = true;
-  bool showAll = false; // 👈 for controlling “Show All” toggle
+  bool showAll = false;
+  bool _loading = true;
+
   Offset _dragStart = Offset.zero;
+  int? _touchedGroupIndex;
 
   double monthlyAverage = 0.0;
-  Map<String, double> _monthlyData =
-      {}; // e.g. {'Jan': 1200.0, 'Feb': 900.0, ...}
-  Map<String, double> _categoryData =
-      {}; // e.g. {'Maintenance': 670.0, 'Insurance': 2300.0}
   double _totalExpenses = 0.0;
   double tco = 0.0;
+
+  Map<String, double> _monthlyData = {};
+  Map<String, double> _categoryData = {};
   List<MapEntry<String, double>> monthlyEntries = [];
   List<Map<String, dynamic>> topCategories = [];
-  bool _loading = true;
-  final String userId = 'weikit523'; // change as needed
+
+  final String userId = 'weikit523'; // Will Change to Authenticated User ID
 
   @override
   void initState() {
     super.initState();
     _loadAnalyticsData();
-  }
-
-  Future<void> _loadAnalyticsData({bool forceReload = false}) async {
-    // Show small loading indicator over the chart only
-    setState(() => _loading = true);
-
-    final summary = await _db.fetchExpenseSummary(
-      userId: userId,
-      duration: _selectedDuration,
-    );
-    final categoryMap = await _db.fetchExpensesByCategory(
-      userId: userId,
-      duration: _selectedDuration,
-    );
-
-    final groupedTotals = Map<String, double>.from(
-      summary['groupedTotals'] ?? {},
-    );
-
-    final sortedKeys = groupedTotals.keys.toList()..sort();
-    monthlyEntries = sortedKeys
-        .map((k) => MapEntry(k, groupedTotals[k]!))
-        .toList();
-
-    if (mounted) {
-      // Sort category map into a list
-      final sortedCategories = categoryMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-      final tcoResult = await _db.predictTCO(userId: userId);
-      final predictedNextTCO = tcoResult['predictedTotal'] ?? 0.0;
-
-      setState(() {
-        _monthlyData = groupedTotals;
-        _categoryData = categoryMap;
-        _totalExpenses = summary['total'] ?? 0.0;
-        monthlyAverage = summary['average'] ?? 0.0;
-        tco = predictedNextTCO;
-        _loading = false;
-
-        // 🧠 Top 5 categories for display
-        topCategories = sortedCategories
-            .take(5)
-            .map((e) => {'category': e.key, 'amount': e.value})
-            .toList();
-      });
-    }
   }
 
   @override
@@ -108,6 +65,122 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     );
   }
 
+  // ----------------------------------------------------------------
+  // 🔹 Load Data Based on Current Date and Duration
+  // ----------------------------------------------------------------
+  Future<void> _loadAnalyticsData() async {
+    setState(() => _loading = true);
+
+    final summary = await _db.fetchExpenseSummary(
+      userId: userId,
+      duration: _selectedDuration,
+      referenceDate: _currentDate,
+    );
+
+    final categoryMap = await _db.fetchExpensesByCategory(
+      userId: userId,
+      duration: _selectedDuration,
+      referenceDate: _currentDate,
+    );
+
+    final groupedTotals = Map<String, double>.from(
+      summary['groupedTotals'] ?? {},
+    );
+    final sortedKeys = groupedTotals.keys.toList()..sort();
+    monthlyEntries = sortedKeys
+        .map((k) => MapEntry(k, groupedTotals[k]!))
+        .toList();
+
+    final sortedCategories = categoryMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final tcoResult = await _db.predictTCO(userId: userId);
+    final predictedNextTCO = tcoResult['predictedTotal'] ?? 0.0;
+
+    if (mounted) {
+      setState(() {
+        _monthlyData = groupedTotals;
+        _categoryData = categoryMap;
+        _totalExpenses = summary['total'] ?? 0.0;
+        monthlyAverage = summary['average'] ?? 0.0;
+        tco = predictedNextTCO;
+        _loading = false;
+        topCategories = sortedCategories
+            .take(5)
+            .map((e) => {'category': e.key, 'amount': e.value})
+            .toList();
+      });
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 🔹 Update Current Period Text
+  // ----------------------------------------------------------------
+  void _updateCurrentPeriod() {
+    if (_selectedDuration == 'YEARS') {
+      _currentPeriod = '${_currentDate.year}';
+    } else if (_selectedDuration == 'MONTHS') {
+      _currentPeriod =
+          '${DateFormat('MMM').format(_currentDate)} ${_currentDate.year}';
+    } else {
+      final startOfWeek = _currentDate.subtract(
+        Duration(days: _currentDate.weekday - 1),
+      );
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      _currentPeriod =
+          '${DateFormat('d MMM').format(startOfWeek)} - ${DateFormat('d MMM').format(endOfWeek)}';
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 🔹 Navigation Between Periods
+  // ----------------------------------------------------------------
+  void _handlePreviousPeriod() {
+    setState(() {
+      if (_selectedDuration == 'YEARS') {
+        _currentDate = DateTime(_currentDate.year - 1);
+      } else if (_selectedDuration == 'MONTHS') {
+        _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
+      } else {
+        _currentDate = _currentDate.subtract(const Duration(days: 7));
+      }
+      _updateCurrentPeriod();
+    });
+    _loadAnalyticsData();
+  }
+
+  void _handleNextPeriod() {
+    final now = DateTime.now();
+    setState(() {
+      if (_selectedDuration == 'YEARS') {
+        if (_currentDate.year < now.year) {
+          _currentDate = DateTime(_currentDate.year + 1);
+        } else {
+          return;
+        }
+      } else if (_selectedDuration == 'MONTHS') {
+        if (_currentDate.year < now.year ||
+            (_currentDate.year == now.year && _currentDate.month < now.month)) {
+          _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
+        } else {
+          return;
+        }
+      } else {
+        final nextWeek = _currentDate.add(const Duration(days: 7));
+        if (nextWeek.isBefore(now)) {
+          _currentDate = nextWeek;
+        } else {
+          return;
+        }
+      }
+      _updateCurrentPeriod();
+    });
+    _loadAnalyticsData();
+  }
+
+  // ----------------------------------------------------------------
+  // 🔹 Filter Bar (centered filters + right icon restored)
+  // ----------------------------------------------------------------
   Widget _buildFilterTabs() {
     Widget buildDurationTab(String label) {
       final isSelected = _selectedDuration == label;
@@ -117,16 +190,12 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
 
           setState(() {
             _selectedDuration = label;
-            _loading = true;
-            _totalExpenses = 0.0; // reset to avoid showing old data
-            monthlyAverage = 0.0;
+            _currentDate = DateTime.now(); // reset to current period
+            _updateCurrentPeriod();
           });
 
-          // wait for rebuild then fetch new data based on new _selectedDuration
-          await Future.delayed(const Duration(milliseconds: 50));
           await _loadAnalyticsData();
         },
-
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -146,42 +215,34 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       );
     }
 
-    Widget buildIconButton({required IconData icon, required bool isBar}) {
-      final isSelected = (isBar && _isBarChart) || (!isBar && !_isBarChart);
-      return GestureDetector(
-        onTap: () => setState(() => _isBarChart = isBar),
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.blue.shade700 : Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 3),
-            ],
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: isSelected ? Colors.white : Colors.black54,
-          ),
-        ),
-      );
-    }
-
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Chart toggle
           Row(
             children: [
-              buildIconButton(icon: Icons.bar_chart, isBar: true),
-              const SizedBox(width: 8),
-              buildIconButton(icon: Icons.pie_chart, isBar: false),
+              IconButton(
+                onPressed: () => setState(() => _isBarChart = true),
+                icon: Icon(
+                  Icons.bar_chart,
+                  color: _isBarChart ? Colors.blue : Colors.black54,
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() => _isBarChart = false),
+                icon: Icon(
+                  Icons.pie_chart,
+                  color: !_isBarChart ? Colors.blue : Colors.black54,
+                ),
+              ),
             ],
           ),
+          // Centered period filters
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               buildDurationTab('DAYS'),
               const SizedBox(width: 8),
@@ -190,101 +251,39 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
               buildDurationTab('YEARS'),
             ],
           ),
-          const Icon(Icons.filter_alt, color: Colors.black54),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPeriodNavigation() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+          // Right side icon restored
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios, size: 16),
-            onPressed: _handlePreviousPeriod,
-          ),
-          Text(
-            _currentPeriod,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 16),
-            onPressed: _handleNextPeriod,
+            icon: const Icon(Icons.filter_list, color: Colors.black54),
+            onPressed: () {},
           ),
         ],
       ),
     );
   }
 
-  DateTime _currentDate = DateTime.now();
-
-  void _handlePreviousPeriod() {
-    setState(() {
-      if (_selectedDuration == 'YEARS') {
-        _currentDate = DateTime(_currentDate.year - 1);
-      } else if (_selectedDuration == 'MONTHS') {
-        _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
-      } else if (_selectedDuration == 'DAYS') {
-        _currentDate = _currentDate.subtract(const Duration(days: 7));
-      }
-      _updateCurrentPeriod();
-      _loadAnalyticsData(); // reload data for new period
-    });
-  }
-
-  void _handleNextPeriod() {
-    final now = DateTime.now();
-
-    setState(() {
-      if (_selectedDuration == 'YEARS') {
-        if (_currentDate.year < now.year) {
-          _currentDate = DateTime(_currentDate.year + 1);
-        } else {
-          return; // don’t go beyond current year
-        }
-      } else if (_selectedDuration == 'MONTHS') {
-        if (_currentDate.year < now.year ||
-            (_currentDate.year == now.year && _currentDate.month < now.month)) {
-          _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
-        } else {
-          return; // don’t go beyond current month
-        }
-      } else if (_selectedDuration == 'DAYS') {
-        final startOfThisWeek = now.subtract(
-          Duration(days: now.weekday - 1),
-        ); // Monday this week
-        final startOfNextWeek = startOfThisWeek.add(const Duration(days: 7));
-        if (_currentDate.isBefore(startOfNextWeek)) {
-          _currentDate = _currentDate.add(const Duration(days: 7));
-        } else {
-          return; // don’t go beyond current week
-        }
-      }
-
-      _updateCurrentPeriod();
-      _loadAnalyticsData();
-    });
-  }
-
-  void _updateCurrentPeriod() {
-    if (_selectedDuration == 'YEARS') {
-      _currentPeriod = '${_currentDate.year}';
-    } else if (_selectedDuration == 'MONTHS') {
-      final month = DateFormat('MMM').format(_currentDate);
-      _currentPeriod = '$month ${_currentDate.year}';
-    } else if (_selectedDuration == 'DAYS') {
-      final startOfWeek = _currentDate.subtract(
-        Duration(days: _currentDate.weekday - 1),
-      );
-      final endOfWeek = startOfWeek.add(const Duration(days: 6));
-      final range =
-          '${DateFormat('d MMM').format(startOfWeek)} - ${DateFormat('d MMM').format(endOfWeek)}';
-      _currentPeriod = range;
-    }
-  }
+  // ----------------------------------------------------------------
+  // 🔹 Period Navigation Row
+  // ----------------------------------------------------------------
+  Widget _buildPeriodNavigation() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _handlePreviousPeriod,
+          icon: const Icon(Icons.arrow_back_ios, size: 16),
+        ),
+        Text(
+          _currentPeriod,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        IconButton(
+          onPressed: _handleNextPeriod,
+          icon: const Icon(Icons.arrow_forward_ios, size: 16),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildChartArea(BuildContext context) {
     return Container(
@@ -452,6 +451,9 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     );
   }
 
+  // ----------------------------------------------------------------
+  // 🔹 No Data Widget with Conditional Navigation
+  // ----------------------------------------------------------------
   Widget _buildNoDataWidget(BuildContext context) {
     String periodText;
     if (_selectedDuration == 'DAYS') {
@@ -461,6 +463,16 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     } else {
       periodText = 'this year';
     }
+
+    final now = DateTime.now();
+    bool isCurrentPeriod =
+        (_selectedDuration == 'YEARS' && _currentDate.year == now.year) ||
+        (_selectedDuration == 'MONTHS' &&
+            _currentDate.year == now.year &&
+            _currentDate.month == now.month) ||
+        (_selectedDuration == 'DAYS' &&
+            _currentDate.isAfter(now.subtract(Duration(days: 7))) &&
+            _currentDate.isBefore(now.add(Duration(days: 1))));
 
     return Column(
       key: const ValueKey('noData'),
@@ -472,15 +484,21 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
         ),
         const SizedBox(height: 6),
         TextButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddServiceRecordPage()),
-            );
-          },
-          child: const Text(
+          onPressed: isCurrentPeriod
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AddServiceRecordPage(),
+                    ),
+                  );
+                }
+              : null,
+          child: Text(
             'Add Service Record Now',
-            style: TextStyle(color: Colors.blue),
+            style: TextStyle(
+              color: isCurrentPeriod ? Colors.blue : Colors.grey,
+            ),
           ),
         ),
       ],
