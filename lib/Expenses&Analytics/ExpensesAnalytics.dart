@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase';
+import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 
 class ExpensesAnalyticsPage extends StatefulWidget {
   const ExpensesAnalyticsPage({super.key});
@@ -17,6 +18,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   int? _touchedGroupIndex;
   bool _isBarChart = true;
   bool showAll = false; // 👈 for controlling “Show All” toggle
+  Offset _dragStart = Offset.zero;
 
   double monthlyAverage = 0.0;
   Map<String, double> _monthlyData =
@@ -36,34 +38,50 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     _loadAnalyticsData();
   }
 
-  Future<void> _loadAnalyticsData() async {
+  Future<void> _loadAnalyticsData({bool forceReload = false}) async {
+    // Show small loading indicator over the chart only
     setState(() => _loading = true);
 
     final summary = await _db.fetchExpenseSummary(
       userId: userId,
       duration: _selectedDuration,
     );
-    final categoryMap = await _db.fetchExpensesByCategory(userId: userId);
+    final categoryMap = await _db.fetchExpensesByCategory(
+      userId: userId,
+      duration: _selectedDuration,
+    );
 
-    // ✅ Fix: Use groupedTotals + average instead of old keys
     final groupedTotals = Map<String, double>.from(
       summary['groupedTotals'] ?? {},
     );
 
     final sortedKeys = groupedTotals.keys.toList()..sort();
-
     monthlyEntries = sortedKeys
         .map((k) => MapEntry(k, groupedTotals[k]!))
         .toList();
 
-    setState(() {
-      _monthlyData = groupedTotals;
-      _categoryData = categoryMap;
-      _totalExpenses = summary['total'] ?? 0.0;
-      monthlyAverage = summary['average'] ?? 0.0;
-      tco = summary['tco'] ?? 0.0;
-      _loading = false;
-    });
+    if (mounted) {
+      // Sort category map into a list
+      final sortedCategories = categoryMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final tcoResult = await _db.predictTCO(userId: userId);
+      final predictedNextTCO = tcoResult['predictedTotal'] ?? 0.0;
+
+      setState(() {
+        _monthlyData = groupedTotals;
+        _categoryData = categoryMap;
+        _totalExpenses = summary['total'] ?? 0.0;
+        monthlyAverage = summary['average'] ?? 0.0;
+        tco = predictedNextTCO;
+        _loading = false;
+
+        // 🧠 Top 5 categories for display
+        topCategories = sortedCategories
+            .take(5)
+            .map((e) => {'category': e.key, 'amount': e.value})
+            .toList();
+      });
+    }
   }
 
   @override
@@ -74,27 +92,19 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
         title: const Text('Expenses Analytics'),
         backgroundColor: const Color(0xFF2196F3),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  children: [
-                    _buildFilterTabs(),
-                    _buildPeriodNavigation(),
-                    _buildMonthlyAverage(),
-                    _buildChartArea(context),
-                    _buildSummaryRow(
-                      Icons.monetization_on,
-                      'Total Expenses',
-                      _totalExpenses,
-                    ),
-                    _buildTopCategories(),
-                  ],
-                ),
-              ),
-            ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            children: [
+              _buildFilterTabs(),
+              _buildPeriodNavigation(),
+              _buildChartArea(context),
+              _buildTopCategories(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -103,8 +113,18 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       final isSelected = _selectedDuration == label;
       return GestureDetector(
         onTap: () async {
-          setState(() => _selectedDuration = label);
-          await _loadAnalyticsData(); // 👈 reload chart data
+          if (_selectedDuration == label) return;
+
+          setState(() {
+            _selectedDuration = label;
+            _loading = true;
+            _totalExpenses = 0.0; // reset to avoid showing old data
+            monthlyAverage = 0.0;
+          });
+
+          // wait for rebuild then fetch new data based on new _selectedDuration
+          await Future.delayed(const Duration(milliseconds: 50));
+          await _loadAnalyticsData();
         },
 
         child: Container(
@@ -184,70 +204,286 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back_ios, size: 16),
-            onPressed: () {},
+            onPressed: _handlePreviousPeriod,
           ),
           Text(
             _currentPeriod,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
           IconButton(
             icon: const Icon(Icons.arrow_forward_ios, size: 16),
-            onPressed: () {},
+            onPressed: _handleNextPeriod,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMonthlyAverage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Monthly Average',
-                style: TextStyle(fontSize: 13, color: Colors.black54),
-              ),
-              Text(
-                'RM ${monthlyAverage.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-    );
+  DateTime _currentDate = DateTime.now();
+
+  void _handlePreviousPeriod() {
+    setState(() {
+      if (_selectedDuration == 'YEARS') {
+        _currentDate = DateTime(_currentDate.year - 1);
+      } else if (_selectedDuration == 'MONTHS') {
+        _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
+      } else if (_selectedDuration == 'DAYS') {
+        _currentDate = _currentDate.subtract(const Duration(days: 7));
+      }
+      _updateCurrentPeriod();
+      _loadAnalyticsData(); // reload data for new period
+    });
+  }
+
+  void _handleNextPeriod() {
+    final now = DateTime.now();
+
+    setState(() {
+      if (_selectedDuration == 'YEARS') {
+        if (_currentDate.year < now.year) {
+          _currentDate = DateTime(_currentDate.year + 1);
+        } else {
+          return; // don’t go beyond current year
+        }
+      } else if (_selectedDuration == 'MONTHS') {
+        if (_currentDate.year < now.year ||
+            (_currentDate.year == now.year && _currentDate.month < now.month)) {
+          _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
+        } else {
+          return; // don’t go beyond current month
+        }
+      } else if (_selectedDuration == 'DAYS') {
+        final startOfThisWeek = now.subtract(
+          Duration(days: now.weekday - 1),
+        ); // Monday this week
+        final startOfNextWeek = startOfThisWeek.add(const Duration(days: 7));
+        if (_currentDate.isBefore(startOfNextWeek)) {
+          _currentDate = _currentDate.add(const Duration(days: 7));
+        } else {
+          return; // don’t go beyond current week
+        }
+      }
+
+      _updateCurrentPeriod();
+      _loadAnalyticsData();
+    });
+  }
+
+  void _updateCurrentPeriod() {
+    if (_selectedDuration == 'YEARS') {
+      _currentPeriod = '${_currentDate.year}';
+    } else if (_selectedDuration == 'MONTHS') {
+      final month = DateFormat('MMM').format(_currentDate);
+      _currentPeriod = '$month ${_currentDate.year}';
+    } else if (_selectedDuration == 'DAYS') {
+      final startOfWeek = _currentDate.subtract(
+        Duration(days: _currentDate.weekday - 1),
+      );
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      final range =
+          '${DateFormat('d MMM').format(startOfWeek)} - ${DateFormat('d MMM').format(endOfWeek)}';
+      _currentPeriod = range;
+    }
   }
 
   Widget _buildChartArea(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 6),
-        ],
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 265,
-            child: _isBarChart
-                ? _buildBarChart(monthlyEntries)
-                : _buildPieChart(_categoryData),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 📊 Title
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _selectedDuration == 'DAYS'
+                  ? 'Weekly Expenses Overview'
+                  : _selectedDuration == 'MONTHS'
+                  ? 'Monthly Expenses Overview'
+                  : 'Yearly Expenses Overview',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+
+          // 💰 Average section
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _selectedDuration == 'DAYS'
+                      ? 'Daily Average'
+                      : _selectedDuration == 'MONTHS'
+                      ? 'Weekly Average'
+                      : 'Monthly Average',
+                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                ),
+                Text(
+                  'RM ${monthlyAverage.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // 📈 Chart Section with swipe gesture
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (details) {
+              _dragStart = details.globalPosition;
+            },
+            onHorizontalDragUpdate: (details) {
+              final dx = details.globalPosition.dx - _dragStart.dx;
+              if (dx.abs() > 50) {
+                // 👈 sensitivity threshold
+                if (dx > 0 && !_isBarChart) {
+                  // Swipe right → from Pie → Bar Chart
+                  setState(() => _isBarChart = true);
+                } else if (dx < 0 && _isBarChart) {
+                  // Swipe left → from Bar → Pie Chart
+                  setState(() => _isBarChart = false);
+                }
+              }
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                        final isBar = child.key == const ValueKey(true);
+
+                        // 👇 Slide direction based on target chart
+                        final beginOffset = isBar
+                            ? const Offset(-0.5, 0) // Bar slides in from left
+                            : const Offset(0.5, 0); // Pie slides in from right
+
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: beginOffset,
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+
+                  child: _loading
+                      ? const SizedBox.shrink()
+                      : _monthlyData.isEmpty
+                      ? _buildNoDataWidget(context)
+                      : SizedBox(
+                          key: ValueKey(_isBarChart),
+                          height: 265,
+                          child: _isBarChart
+                              ? _buildBarChart(monthlyEntries)
+                              : _buildPieChart(_categoryData),
+                        ),
+                ),
+                if (_loading)
+                  Container(
+                    color: Colors.white.withOpacity(0.6),
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 💵 Total & TCO Summary inside the same box
+          Divider(color: Colors.grey.withOpacity(0.3)),
+
+          _buildSummaryRow(
+            Icons.monetization_on,
+            'Total Expenses',
+            _totalExpenses,
+          ),
+          if (_selectedDuration == 'YEARS')
+            _buildSummaryRow(
+              Icons.trending_up,
+              'Predicted Next Year Cost (TCO)',
+              tco,
+            ),
+
+          const SizedBox(height: 6),
+          Center(
+            child: Text(
+              '← Swipe to switch chart →',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade500,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoDataWidget(BuildContext context) {
+    String periodText;
+    if (_selectedDuration == 'DAYS') {
+      periodText = 'this week';
+    } else if (_selectedDuration == 'MONTHS') {
+      periodText = 'this month';
+    } else {
+      periodText = 'this year';
+    }
+
+    return Column(
+      key: const ValueKey('noData'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'No service record $periodText.',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 6),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddServiceRecordPage()),
+            );
+          },
+          child: const Text(
+            'Add Service Record Now',
+            style: TextStyle(color: Colors.blue),
+          ),
+        ),
+      ],
     );
   }
 
@@ -255,16 +491,55 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   // 1) Bar chart builder
   // -----------------------------
   Widget _buildBarChart(List<MapEntry<String, double>> monthlyEntries) {
-    if (monthlyEntries.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text("No data to display."),
+    // 🧠 Handle no data case
+    final hasData = monthlyEntries.any((entry) => entry.value > 0);
+    if (!hasData) {
+      final msg = _selectedDuration == 'DAYS'
+          ? 'No service record this week.'
+          : _selectedDuration == 'MONTHS'
+          ? 'No service record this month.'
+          : 'No service record this year.';
+
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.info_outline, size: 60, color: Colors.grey),
+            const SizedBox(height: 10),
+            Text(
+              msg,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddServiceRecordPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+              label: const Text(
+                'Add Service Record Now',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    // 🧠 Determine correct X-axis order based on _selectedDuration
+    // 🧠 Correct X-axis label order
     final xLabels = _selectedDuration == 'DAYS'
         ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         : _selectedDuration == 'MONTHS'
@@ -284,7 +559,6 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
             'Dec',
           ];
 
-    // Ensure all labels are present
     final Map<String, double> fullData = {
       for (final label in xLabels)
         label: monthlyEntries
@@ -297,12 +571,15 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
 
     final entries = fullData.entries.toList();
 
-    final maxY =
-        (entries.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 1.2)
-            .ceilToDouble();
-
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 👇 compute inside LayoutBuilder (so no scope issue)
+        final maxValue = entries
+            .map((e) => e.value)
+            .fold<double>(0, (a, b) => a > b ? a : b);
+
+        final double maxY = ((maxValue * 1.2) / 100).ceilToDouble() * 100;
+        final interval = (maxY / 5).toDouble(); // evenly spaced Y-axis lines
         final chartHeight = constraints.maxWidth * 0.6;
 
         return Column(
@@ -323,25 +600,55 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             SizedBox(
               height: chartHeight.clamp(200, 350),
               child: BarChart(
                 BarChartData(
                   maxY: maxY,
                   borderData: FlBorderData(show: false),
-                  gridData: FlGridData(show: true, drawVerticalLine: false),
-                  titlesData: FlTitlesData(
-                    show: true,
 
-                    // Left axis (RM values)
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: interval,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey.withOpacity(0.4),
+                      strokeWidth: 1,
+                      dashArray: [4, 4],
+                    ),
+                  ),
+
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: monthlyAverage,
+                        color: Colors.redAccent.withOpacity(0.8),
+                        strokeWidth: 2,
+                        dashArray: [6, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topRight,
+                          padding: const EdgeInsets.only(right: 8, top: 4),
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            backgroundColor: Colors.white,
+                          ),
+                          labelResolver: (line) =>
+                              'Avg RM${monthlyAverage.toStringAsFixed(0)}',
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 50,
-                        interval: maxY > 0
-                            ? maxY / 5
-                            : 1, // ✅ Prevent 0 interval
+                        interval: interval,
                         getTitlesWidget: (value, meta) => Padding(
                           padding: const EdgeInsets.only(right: 5),
                           child: Text(
@@ -355,8 +662,6 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                         ),
                       ),
                     ),
-
-                    // Bottom axis (dynamic X labels)
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
@@ -379,7 +684,6 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                         },
                       ),
                     ),
-
                     topTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
                     ),
@@ -388,11 +692,9 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                     ),
                   ),
 
-                  // Bar data
                   barGroups: entries.asMap().entries.map((entry) {
                     final index = entry.key;
                     final amount = entry.value.value;
-
                     return BarChartGroupData(
                       x: index,
                       barRods: [
@@ -400,8 +702,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                           toY: amount,
                           width: 22,
                           color: index == _touchedGroupIndex
-                              ? Colors
-                                    .blueAccent // Optional: Highlight selected bar
+                              ? Colors.blueAccent
                               : Colors.lightBlue,
                           borderRadius: BorderRadius.circular(6),
                           borderSide: const BorderSide(
@@ -416,30 +717,23 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                     );
                   }).toList(),
 
-                  // Tooltip config
                   barTouchData: BarTouchData(
                     enabled: true,
-                    // 2. Implement the touchCallback to handle click/tap
-                    touchCallback: (FlTouchEvent event, BarTouchResponse? response) {
-                      // Check for the *end* of a tap/click action (pointer released).
+                    touchCallback: (event, response) {
                       if (event is FlTapUpEvent || event is FlLongPressEnd) {
                         setState(() {
                           if (response?.spot != null) {
                             final newIndex =
                                 response!.spot!.touchedBarGroupIndex;
-
-                            // Toggle the selection: If tapped again, deselect; otherwise, select the new bar.
                             _touchedGroupIndex =
                                 (newIndex == _touchedGroupIndex)
                                 ? null
                                 : newIndex;
                           } else {
-                            // Tap occurred outside the bars, so clear the selection.
                             _touchedGroupIndex = null;
                           }
                         });
                       }
-                      // For FlTouchEvent.longPress and other events, we don't change the state.
                     },
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -476,9 +770,56 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   // 2) Pie chart builder + legend
   // -----------------------------
   Widget _buildPieChart(Map<String, double> data) {
-    final total = data.values.fold(0.0, (sum, v) => sum + v);
+    final hasData = data.values.any((v) => v > 0);
 
-    // Limit to top 6 categories for compact display
+    if (!hasData) {
+      final msg = _selectedDuration == 'DAYS'
+          ? 'No service record this week.'
+          : _selectedDuration == 'MONTHS'
+          ? 'No service record this month.'
+          : 'No service record this year.';
+
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.info_outline, size: 60, color: Colors.grey),
+            const SizedBox(height: 10),
+            Text(
+              msg,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddServiceRecordPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+              label: const Text(
+                'Add Service Record Now',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ✅ Existing Pie Chart (unchanged below)
+    final total = data.values.fold(0.0, (sum, v) => sum + v);
     final limitedData = showAll
         ? data
         : Map<String, double>.fromEntries(data.entries.take(6));
@@ -527,15 +868,12 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // ✅ Center chart + legend horizontally
         Center(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🔸 Pie Chart
               SizedBox(
                 height: 200,
                 width: 200,
@@ -548,10 +886,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 32),
-
-              // 🔸 Legend Labels (Only category names)
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +894,6 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                   final color =
                       colors[limitedData.keys.toList().indexOf(entry.key) %
                           colors.length];
-
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
                     child: Row(
@@ -590,9 +924,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
             ],
           ),
         ),
-
-        if (data.length > 6) ...[
-          const SizedBox(height: 8),
+        if (data.length > 6)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -603,7 +935,6 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
               ),
             ),
           ),
-        ],
       ],
     );
   }
