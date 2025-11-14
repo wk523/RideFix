@@ -90,7 +90,7 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
         model: modelController.text.trim().toUpperCase(),
         plateNumber: plateController.text.trim().toUpperCase(),
         manYear: yearController.text.trim(),
-        ownerId: widget.vehicleDetails.ownerId,
+        userId: widget.vehicleDetails.userId,
         roadTaxExpired: roadTaxController.text.trim(),
         mileage: mileageController.text.trim(),
         imageUrl: oldImageUrl ?? '',

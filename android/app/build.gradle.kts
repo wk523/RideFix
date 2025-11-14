@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.ridefix"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName

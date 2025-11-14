@@ -13,7 +13,7 @@ class Vehicle {
   final String model;
   final String plateNumber;
   final String manYear;
-  final String ownerId;
+  final String userId;
   final String roadTaxExpired;
   final String mileage;
   final String imageUrl;
@@ -25,7 +25,7 @@ class Vehicle {
     required this.model,
     required this.plateNumber,
     required this.manYear,
-    required this.ownerId,
+    required this.userId,
     required this.roadTaxExpired,
     required this.mileage,
     required this.imageUrl,
@@ -40,7 +40,7 @@ class Vehicle {
       model: data['Model'] ?? '',
       plateNumber: data['Platenumber'] ?? '',
       manYear: data['Manyear'] ?? '',
-      ownerId: data['ownerid'] ?? '',
+      userId: data['userid'] ?? '',
       roadTaxExpired: data['Roadtaxexpired']?.toString() ?? '',
       mileage: data['mileage']?.toString() ?? '0',
       imageUrl: data['imageUrl'] ?? '',
@@ -55,7 +55,7 @@ class Vehicle {
       'Model': model,
       'Platenumber': plateNumber,
       'Manyear': manYear,
-      'ownerid': ownerId,
+      'userid': userId,
       'Roadtaxexpired': roadTaxExpired,
       'mileage': mileage,
       'imageUrl': imageUrl,
@@ -192,7 +192,7 @@ class VehicleDataService {
         model: vehicle.model.trim().toUpperCase(),
         plateNumber: vehicle.plateNumber.trim().toUpperCase(),
         manYear: vehicle.manYear.trim(),
-        ownerId: vehicle.ownerId,
+        userId: vehicle.userId,
         roadTaxExpired: vehicle.roadTaxExpired.trim(),
         mileage: vehicle.mileage.trim(),
         imageUrl: vehicle.imageUrl,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase';
+import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase.dart';
 import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 
 class ExpensesAnalyticsPage extends StatefulWidget {
@@ -47,10 +47,12 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        automaticallyImplyLeading: true,
+        title: const Text(
+          'Expenses Analytics',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
-        title: const Text('Expenses Analytics'),
-        backgroundColor: const Color(0xFF2196F3),
+        backgroundColor: Colors.blue,
       ),
 
       body: SafeArea(

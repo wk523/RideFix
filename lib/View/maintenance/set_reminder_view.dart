@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:ridefix/controller/maintenance_reminder_controller.dart';
+import 'package:ridefix/Controller/maintenance_reminder_controller.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
 
 class SetReminderView extends StatefulWidget {
@@ -15,7 +15,13 @@ class _SetReminderViewState extends State<SetReminderView> {
   final _controller = MaintenanceReminderController();
 
   final List<String> _categories = [
-    'Fuel', 'Maintenance', 'Car Wash', 'Insurance', 'Road Tax', 'Installment', 'Make Up'
+    'Fuel',
+    'Maintenance',
+    'Car Wash',
+    'Insurance',
+    'Road Tax',
+    'Installment',
+    'Make Up',
   ];
 
   String? _selectedCategory;
@@ -34,13 +40,9 @@ class _SetReminderViewState extends State<SetReminderView> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
-
   Future<void> _selectTime() async {
     final now = TimeOfDay.now();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: now,
-    );
+    final picked = await showTimePicker(context: context, initialTime: now);
 
     if (picked != null) {
       // If date is today, prevent selecting a past time
@@ -66,15 +68,16 @@ class _SetReminderViewState extends State<SetReminderView> {
     }
   }
 
-
   Future<void> _saveReminder() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    if (_selectedCategory == null || _selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+    if (_selectedCategory == null ||
+        _selectedDate == null ||
+        _selectedTime == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
@@ -86,8 +89,6 @@ class _SetReminderViewState extends State<SetReminderView> {
       timeExpired: _selectedTime!.format(context),
       status: 'active',
     );
-
-
 
     await _controller.addReminder(reminder);
 
@@ -112,7 +113,9 @@ class _SetReminderViewState extends State<SetReminderView> {
               value: _selectedCategory,
               hint: const Text("Select category"),
               items: _categories
-                  .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                  .map(
+                    (item) => DropdownMenuItem(value: item, child: Text(item)),
+                  )
                   .toList(),
               onChanged: (val) => setState(() => _selectedCategory = val),
             ),
@@ -122,17 +125,19 @@ class _SetReminderViewState extends State<SetReminderView> {
             ElevatedButton.icon(
               onPressed: _selectDate,
               icon: const Icon(Icons.calendar_today),
-              label: Text(_selectedDate == null
-                  ? "Date"
-                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
+              label: Text(
+                _selectedDate == null
+                    ? "Date"
+                    : DateFormat('yyyy-MM-dd').format(_selectedDate!),
+              ),
             ),
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: _selectTime,
               icon: const Icon(Icons.access_time),
-              label: Text(_selectedTime == null
-                  ? "Time"
-                  : _selectedTime!.format(context)),
+              label: Text(
+                _selectedTime == null ? "Time" : _selectedTime!.format(context),
+              ),
             ),
             const Spacer(),
             SizedBox(

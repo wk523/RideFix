@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/HomePage.dart';
+import 'package:ridefix/Services/notification_service.dart';
 import 'package:ridefix/View/auth/register_screen.dart';
-import 'package:ridefix/services/notification_service.dart';
 
 // Import RideFX onboarding and login pages
 import 'View/auth/welcome_screen.dart';
@@ -14,9 +16,28 @@ import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
+//Import troubleshooting
+import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
+import 'package:ridefix/view/troubleshoot/qna_list_view.dart';
+
+//Import Maintenance Reminder
+import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  try {
+    // Initialize Firebase FIRST (must)
+    await Firebase.initializeApp();
+    print('✅ Firebase initialized successfully');
+
+    // Initialize notification AFTER Firebase
+    await NotificationService().initialize();
+    print('✅ Notification service initialized successfully');
+  } catch (e) {
+    print('❌ Error during initialization: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -37,14 +58,34 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-
-      // Set the VehicleListScreen as the home screen
-      // home: VehicleDetailsPage(details: mockDetails),
-      home: VehicleListPage(),
-      debugShowCheckedModeBanner: false, // Optional: Removes the debug banner
+      home: const WelcomeScreen(),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const HomePage(),
+        '/vehicleList': (context) => VehicleListPage(),
+        '/vehicleRegister': (context) => VehicleRegistrationPage(),
+        '/vehicleDetails': (context) =>
+            VehicleDetailsPage(vehicleId: '', userId: ''),
+        '/updateVehicle': (context) => UpdateVehiclePage(
+          vehicleDetails: Vehicle(
+            vehicleId: '',
+            brand: '',
+            color: '',
+            model: '',
+            plateNumber: '',
+            manYear: '',
+            userId: '',
+            roadTaxExpired: '',
+            mileage: '',
+            imageUrl: '',
+          ),
+        ),
+        '/profile': (context) => const ProfileScreen(),
+        '/guide': (context) => const TroubleshootingPage(),
+        '/register': (context) => const RegisterScreen(),
+        '/qnaList': (context) => QnaListView(),
+        '/maintenance': (context) => MaintenanceMainView(),
+      },
     );
   }
 }
-
-// NOTE: Ensure your 'vehiclelist.dart' file contains the
-// VehicleListScreen, Vehicle, and mockVehicles classes.

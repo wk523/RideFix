@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/controller/maintenance_reminder_controller.dart';
+import 'package:ridefix/Controller/maintenance_reminder_controller.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
 
 class EditReminderFormPage extends StatefulWidget {
@@ -13,10 +13,17 @@ class EditReminderFormPage extends StatefulWidget {
 
 class _EditReminderFormPageState extends State<EditReminderFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final MaintenanceReminderController _controller = MaintenanceReminderController();
+  final MaintenanceReminderController _controller =
+      MaintenanceReminderController();
 
   final List<String> _categories = [
-    'Fuel', 'Maintenance', 'Car Wash', 'Insurance', 'Road Tax', 'Installment', 'Make Up'
+    'Fuel',
+    'Maintenance',
+    'Car Wash',
+    'Insurance',
+    'Road Tax',
+    'Installment',
+    'Make Up',
   ];
 
   String? _selectedCategory;
@@ -98,17 +105,22 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     if (_isExpired) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
+          content: Text(
+            'Cannot edit expired reminders. Please delete and create a new one.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final currentDate = DateTime.tryParse(_dateController.text) ?? DateTime.now();
+    final currentDate =
+        DateTime.tryParse(_dateController.text) ?? DateTime.now();
     final newDate = await showDatePicker(
       context: context,
-      initialDate: currentDate.isBefore(DateTime.now()) ? DateTime.now() : currentDate,
+      initialDate: currentDate.isBefore(DateTime.now())
+          ? DateTime.now()
+          : currentDate,
       firstDate: DateTime.now(), // Prevent past dates
       lastDate: DateTime(2100),
     );
@@ -132,7 +144,8 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
 
       // Handle both 24-hour and 12-hour formats
       TimeOfDay timeOfDay;
-      if (_timeController.text.contains('AM') || _timeController.text.contains('PM')) {
+      if (_timeController.text.contains('AM') ||
+          _timeController.text.contains('PM')) {
         final format = DateFormat.jm();
         final dateTime = format.parse(_timeController.text);
         timeOfDay = TimeOfDay(hour: dateTime.hour, minute: dateTime.minute);
@@ -156,7 +169,11 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
           _timeController.text = '';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Time cleared as it would be in the past with the new date')),
+          const SnackBar(
+            content: Text(
+              'Time cleared as it would be in the past with the new date',
+            ),
+          ),
         );
       }
     }
@@ -166,7 +183,9 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     if (_isExpired) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
+          content: Text(
+            'Cannot edit expired reminders. Please delete and create a new one.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -181,10 +200,7 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     }
 
     final now = TimeOfDay.now();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: now,
-    );
+    final picked = await showTimePicker(context: context, initialTime: now);
 
     if (picked != null) {
       // Check if the selected date and time combination is in the past
@@ -217,7 +233,9 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     if (timeString.contains('AM') || timeString.contains('PM')) {
       // Handle 12-hour format (e.g., "12:44 PM")
       final isPM = timeString.contains('PM');
-      final timeWithoutPeriod = timeString.replaceAll(RegExp(r'[AP]M'), '').trim();
+      final timeWithoutPeriod = timeString
+          .replaceAll(RegExp(r'[AP]M'), '')
+          .trim();
       final parts = timeWithoutPeriod.split(':');
       int hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
@@ -233,10 +251,7 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     } else {
       // Handle 24-hour format
       final parts = timeString.split(':');
-      return TimeOfDay(
-        hour: int.parse(parts[0]),
-        minute: int.parse(parts[1]),
-      );
+      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     }
   }
 
@@ -275,7 +290,9 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     if (_isExpired) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
+          content: Text(
+            'Cannot edit expired reminders. Please delete and create a new one.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -285,9 +302,9 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
     if (_formKey.currentState!.validate()) {
       final dateTimeError = _validateDateTime();
       if (dateTimeError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(dateTimeError)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(dateTimeError)));
         return;
       }
 
@@ -354,7 +371,10 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange.shade800,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -370,7 +390,10 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                 ),
               ],
 
-              const Text("CATEGORY", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                "CATEGORY",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
@@ -378,17 +401,25 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                   border: const OutlineInputBorder(),
                   enabled: !_isExpired,
                 ),
-                items: _categories.map((item) =>
-                    DropdownMenuItem(value: item, child: Text(item))
-                ).toList(),
-                onChanged: _isExpired ? null : (val) => setState(() => _selectedCategory = val),
+                items: _categories
+                    .map(
+                      (item) =>
+                          DropdownMenuItem(value: item, child: Text(item)),
+                    )
+                    .toList(),
+                onChanged: _isExpired
+                    ? null
+                    : (val) => setState(() => _selectedCategory = val),
                 validator: (val) => val == null || val.isEmpty
                     ? 'Please select a category'
                     : null,
               ),
               const SizedBox(height: 20),
 
-              const Text("DUE DATE & TIME", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                "DUE DATE & TIME",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
 
               TextFormField(
@@ -402,9 +433,8 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                   fillColor: _isExpired ? Colors.grey.shade200 : null,
                 ),
                 onTap: _isExpired ? null : _pickDate,
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Please select a date'
-                    : null,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Please select a date' : null,
               ),
               const SizedBox(height: 12),
 
@@ -419,9 +449,8 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                   fillColor: _isExpired ? Colors.grey.shade200 : null,
                 ),
                 onTap: _isExpired ? null : _pickTime,
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Please select a time'
-                    : null,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Please select a time' : null,
               ),
               const SizedBox(height: 30),
 

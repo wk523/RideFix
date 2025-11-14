@@ -417,7 +417,10 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service Records'),
+        title: const Text(
+          'Service Records',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.blue,
       ),

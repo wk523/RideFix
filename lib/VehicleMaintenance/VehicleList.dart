@@ -163,7 +163,7 @@ class VehicleListCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (context) => VehicleDetailsPage(
               vehicleId: vehicle.vehicleId,
-              ownerId: '', // ✅ This must not be empty
+              userId: '', // ✅ This must not be empty
             ),
           ),
         );

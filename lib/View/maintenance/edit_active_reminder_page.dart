@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:ridefix/controller/maintenance_reminder_controller.dart';
+import 'package:ridefix/Controller/maintenance_reminder_controller.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
 import 'package:ridefix/view/maintenance/edit_reminder_form_page.dart';
 
@@ -41,7 +41,9 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
 
       if (timeExpired.contains('AM') || timeExpired.contains('PM')) {
         final isPM = timeExpired.contains('PM');
-        final timeWithoutPeriod = timeExpired.replaceAll(RegExp(r'[AP]M'), '').trim();
+        final timeWithoutPeriod = timeExpired
+            .replaceAll(RegExp(r'[AP]M'), '')
+            .trim();
         final parts = timeWithoutPeriod.split(':');
         int hour = int.parse(parts[0]);
         final minute = int.parse(parts[1]);
@@ -55,7 +57,10 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
         timeOfDay = TimeOfDay(hour: hour, minute: minute);
       } else {
         final parts = timeExpired.split(':');
-        timeOfDay = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+        timeOfDay = TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
       }
 
       final reminderDateTime = DateTime(
@@ -69,9 +74,12 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
       final difference = reminderDateTime.difference(DateTime.now());
 
       if (difference.isNegative) return 'Expired';
-      if (difference.inDays > 0) return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} left';
-      if (difference.inHours > 0) return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} left';
-      if (difference.inMinutes > 0) return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} left';
+      if (difference.inDays > 0)
+        return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} left';
+      if (difference.inHours > 0)
+        return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} left';
+      if (difference.inMinutes > 0)
+        return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} left';
 
       return 'Less than a minute';
     } catch (e) {
@@ -87,7 +95,9 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
 
       if (timeExpired.contains('AM') || timeExpired.contains('PM')) {
         final isPM = timeExpired.contains('PM');
-        final timeWithoutPeriod = timeExpired.replaceAll(RegExp(r'[AP]M'), '').trim();
+        final timeWithoutPeriod = timeExpired
+            .replaceAll(RegExp(r'[AP]M'), '')
+            .trim();
         final parts = timeWithoutPeriod.split(':');
         int hour = int.parse(parts[0]);
         final minute = int.parse(parts[1]);
@@ -101,7 +111,10 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
         timeOfDay = TimeOfDay(hour: hour, minute: minute);
       } else {
         final parts = timeExpired.split(':');
-        timeOfDay = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+        timeOfDay = TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
       }
 
       final reminderDateTime = DateTime(
@@ -167,7 +180,11 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey[400]),
+                  Icon(
+                    Icons.notifications_off_outlined,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No active reminders found.',
@@ -194,21 +211,36 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
               itemCount: reminders.length,
               itemBuilder: (context, index) {
                 final reminder = reminders[index];
-                final timeRemaining = _getTimeRemaining(reminder.dateExpired, reminder.timeExpired);
-                final timeColor = _getTimeRemainingColor(reminder.dateExpired, reminder.timeExpired);
+                final timeRemaining = _getTimeRemaining(
+                  reminder.dateExpired,
+                  reminder.timeExpired,
+                );
+                final timeColor = _getTimeRemainingColor(
+                  reminder.dateExpired,
+                  reminder.timeExpired,
+                );
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   elevation: 2,
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     leading: CircleAvatar(
                       backgroundColor: timeColor.withOpacity(0.2),
                       child: Icon(Icons.notifications_active, color: timeColor),
                     ),
                     title: Text(
                       reminder.maintenanceType,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,15 +252,25 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
                         ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: timeColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: timeColor.withOpacity(0.3), width: 1),
+                            border: Border.all(
+                              color: timeColor.withOpacity(0.3),
+                              width: 1,
+                            ),
                           ),
                           child: Text(
                             timeRemaining,
-                            style: TextStyle(fontSize: 12, color: timeColor, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: timeColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -238,7 +280,10 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
                       onPressed: () async {
                         await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => EditReminderFormPage(reminder: reminder)),
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditReminderFormPage(reminder: reminder),
+                          ),
                         );
                         if (mounted) setState(() {});
                       },

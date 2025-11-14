@@ -9,7 +9,7 @@ class NotificationService {
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _initialized = false;
@@ -20,7 +20,9 @@ class NotificationService {
     // Initialize timezones
     tzData.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -40,17 +42,15 @@ class NotificationService {
     // iOS permission
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+          IOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
 
     // Android 13+ permission
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
 
     _initialized = true;
@@ -74,10 +74,9 @@ class NotificationService {
 
   Future<void> _markReminderAsExpired(String reminderId) async {
     try {
-      await _firestore
-          .collection('MaintenanceReminder')
-          .doc(reminderId)
-          .update({'status': 'expired'});
+      await _firestore.collection('MaintenanceReminder').doc(reminderId).update(
+        {'status': 'expired'},
+      );
     } catch (e) {
       print('Error updating reminder status: $e');
     }
@@ -126,7 +125,7 @@ class NotificationService {
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: reminderId,
       );
 
@@ -143,10 +142,10 @@ class NotificationService {
   }
 
   Future<void> _scheduleAutoExpire(
-      int id,
-      String reminderId,
-      DateTime expireTime,
-      ) async {
+    int id,
+    String reminderId,
+    DateTime expireTime,
+  ) async {
     try {
       final tzExpireTime = tz.TZDateTime.from(expireTime, tz.local);
 
@@ -181,7 +180,7 @@ class NotificationService {
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: 'expire:$reminderId',
       );
 

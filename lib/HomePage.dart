@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:ridefix/Expenses&Analytics/ExpensesAnalytics.dart';
+import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/ServiceRecord/ServiceRecord.dart';
+import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
+import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+import 'package:ridefix/View/profile/profile_screen.dart';
 
 void main() {
-  runApp(const CarCareApp());
+  runApp(const HomePage());
 }
 
-class CarCareApp extends StatelessWidget {
-  const CarCareApp({super.key});
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +367,14 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'My Vehicles',
                   icon: Icons.directions_car_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VehicleListPage(),
+                      ),
+                    );
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Reminders',
@@ -371,7 +384,14 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Service Records',
                   icon: Icons.file_copy_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ServiceRecordPage(),
+                      ),
+                    );
+                  },
                 ),
 
                 // Services
@@ -402,7 +422,14 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Expense Analytics',
                   icon: Icons.trending_up,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExpensesAnalyticsPage(),
+                      ),
+                    );
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Emergency Assistance',
@@ -418,32 +445,45 @@ class AppDrawer extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: Color(0xFFDCEAFB),
-                  child: Text(
-                    'JD',
-                    style: TextStyle(
-                      color: Color(0xFF1E40AF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'John Doe',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ProfileScreen()),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Color(0xFFDCEAFB),
+                        child: Text(
+                          'JD',
+                          style: TextStyle(
+                            color: Color(0xFF1E40AF),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'WXY 1234',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'John Doe',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'WXY 1234',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
@@ -601,7 +641,14 @@ class DashboardScreen extends StatelessWidget {
                       icon: Icons.access_time,
                       label: 'Add Reminder',
                       color: Colors.blue.shade500,
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MaintenanceMainView(),
+                          ),
+                        );
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.location_on_outlined,
@@ -613,7 +660,14 @@ class DashboardScreen extends StatelessWidget {
                       icon: Icons.add_card_outlined,
                       label: 'Add Service',
                       color: Colors.blue.shade500,
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddServiceRecordPage(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

@@ -45,7 +45,11 @@ class ServiceRecordDetailsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('$category Details'),
+        title: Text(
+          '$category Details',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         backgroundColor: Colors.blue.shade700,
       ),
       body: SingleChildScrollView(

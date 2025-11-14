@@ -289,7 +289,17 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
     return Stack(
       children: [
         Scaffold(
-          appBar: AppBar(title: const Text('Add Service Record')),
+          appBar: AppBar(
+            title: const Text(
+              'Add Service Record',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            centerTitle: true,
+            backgroundColor: Colors.blue,
+          ),
           body: Column(
             children: [
               // Scrollable content

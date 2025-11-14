@@ -335,7 +335,7 @@ class _VehicleRegistrationPageState extends State<VehicleRegistrationPage> {
         model: modelController.text.trim().toUpperCase(),
         plateNumber: plateController.text.trim().toUpperCase(),
         manYear: yearController.text.trim(),
-        ownerId: 'user123',
+        userId: 'weikit523',
         roadTaxExpired: roadTaxController.text.trim(),
         mileage: mileageController.text.trim(),
         imageUrl: imageUrl,

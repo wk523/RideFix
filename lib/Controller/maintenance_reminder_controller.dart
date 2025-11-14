@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ridefix/Services/notification_service.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
-import 'package:ridefix/services/notification_service.dart';
 
 class MaintenanceReminderController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -45,15 +45,22 @@ class MaintenanceReminderController {
         .where('userId', isEqualTo: user.uid)
         .orderBy('dateExpired', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => MaintenanceReminderModel.fromMap(doc.data(), doc.id))
-        .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => MaintenanceReminderModel.fromMap(doc.data(), doc.id),
+              )
+              .toList(),
+        );
   }
 
   Future<void> updateReminder(String id, Map<String, dynamic> data) async {
     try {
       // Check if reminder exists and is not expired
-      final docSnapshot = await _firestore.collection(_collectionName).doc(id).get();
+      final docSnapshot = await _firestore
+          .collection(_collectionName)
+          .doc(id)
+          .get();
 
       if (!docSnapshot.exists) {
         throw Exception('Reminder not found');
@@ -194,52 +201,56 @@ class MaintenanceReminderController {
         .orderBy('dateExpired')
         .snapshots()
         .asyncMap((snapshot) async {
-      final now = DateTime.now();
-      final activeReminders = <MaintenanceReminderModel>[];
-      final expiredIds = <String>[];
+          final now = DateTime.now();
+          final activeReminders = <MaintenanceReminderModel>[];
+          final expiredIds = <String>[];
 
-      // First pass: categorize reminders
-      for (var doc in snapshot.docs) {
-        try {
-          final reminder = MaintenanceReminderModel.fromMap(doc.data(), doc.id);
-          final reminderDateTime = _parseDateTime(
-            reminder.dateExpired,
-            reminder.timeExpired,
-          );
+          // First pass: categorize reminders
+          for (var doc in snapshot.docs) {
+            try {
+              final reminder = MaintenanceReminderModel.fromMap(
+                doc.data(),
+                doc.id,
+              );
+              final reminderDateTime = _parseDateTime(
+                reminder.dateExpired,
+                reminder.timeExpired,
+              );
 
-          if (reminderDateTime.isBefore(now)) {
-            expiredIds.add(doc.id);
-            print('⏰ Found expired: ${reminder.maintenanceType} - Was due: $reminderDateTime');
-          } else {
-            activeReminders.add(reminder);
-            print('✅ Active: ${reminder.maintenanceType} - Due: $reminderDateTime');
+              if (reminderDateTime.isBefore(now)) {
+                expiredIds.add(doc.id);
+                print(
+                  '⏰ Found expired: ${reminder.maintenanceType} - Was due: $reminderDateTime',
+                );
+              } else {
+                activeReminders.add(reminder);
+                print(
+                  '✅ Active: ${reminder.maintenanceType} - Due: $reminderDateTime',
+                );
+              }
+            } catch (e) {
+              print('❌ Error parsing reminder ${doc.id}: $e');
+            }
           }
-        } catch (e) {
-          print('❌ Error parsing reminder ${doc.id}: $e');
-        }
-      }
 
-      // Batch update expired reminders
-      if (expiredIds.isNotEmpty) {
-        final batch = _firestore.batch();
-        for (var id in expiredIds) {
-          batch.update(
-            _firestore.collection(_collectionName).doc(id),
-            {
-              'status': 'expired',
-              'expiredAt': FieldValue.serverTimestamp(),
-            },
-          );
-          // Cancel notifications
-          _notificationService.cancelNotification(id.hashCode);
-        }
-        await batch.commit();
-        print('Batch updated ${expiredIds.length} expired reminders');
-      }
+          // Batch update expired reminders
+          if (expiredIds.isNotEmpty) {
+            final batch = _firestore.batch();
+            for (var id in expiredIds) {
+              batch.update(_firestore.collection(_collectionName).doc(id), {
+                'status': 'expired',
+                'expiredAt': FieldValue.serverTimestamp(),
+              });
+              // Cancel notifications
+              _notificationService.cancelNotification(id.hashCode);
+            }
+            await batch.commit();
+            print('Batch updated ${expiredIds.length} expired reminders');
+          }
 
-      print('📋 Total active reminders: ${activeReminders.length}');
-      return activeReminders;
-    });
+          print('📋 Total active reminders: ${activeReminders.length}');
+          return activeReminders;
+        });
   }
 
   /// Get expired reminders
@@ -252,14 +263,17 @@ class MaintenanceReminderController {
         .where('status', isEqualTo: 'expired')
         .orderBy('dateExpired', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => MaintenanceReminderModel.fromMap(doc.data(), doc.id))
-        .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => MaintenanceReminderModel.fromMap(doc.data(), doc.id),
+              )
+              .toList(),
+        );
   }
 
   /// Confirm delete helper with notification cancellation
-  Future<bool> confirmAndDeleteReminder(
-      BuildContext context, String id) async {
+  Future<bool> confirmAndDeleteReminder(BuildContext context, String id) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -267,15 +281,18 @@ class MaintenanceReminderController {
         content: const Text("Are you sure you want to delete this reminder?"),
         actions: [
           TextButton(
-              style: ElevatedButton.styleFrom(foregroundColor: Colors.black),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text("No")),
+            style: ElevatedButton.styleFrom(foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("No"),
+          ),
           ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade400,
-                  foregroundColor: Colors.black),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("Yes")),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text("Yes"),
+          ),
         ],
       ),
     );
