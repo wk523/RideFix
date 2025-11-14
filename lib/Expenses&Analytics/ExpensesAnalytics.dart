@@ -38,6 +38,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   @override
   void initState() {
     super.initState();
+    _updateCurrentPeriod();
     _loadAnalyticsData();
   }
 
@@ -46,9 +47,12 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        automaticallyImplyLeading: true,
+        centerTitle: true,
         title: const Text('Expenses Analytics'),
         backgroundColor: const Color(0xFF2196F3),
       ),
+
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 16),
@@ -120,13 +124,13 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     if (_selectedDuration == 'YEARS') {
       _currentPeriod = '${_currentDate.year}';
     } else if (_selectedDuration == 'MONTHS') {
-      _currentPeriod =
-          '${DateFormat('MMM').format(_currentDate)} ${_currentDate.year}';
+      _currentPeriod = DateFormat('MMM yyyy').format(_currentDate);
     } else {
       final startOfWeek = _currentDate.subtract(
         Duration(days: _currentDate.weekday - 1),
       );
       final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
       _currentPeriod =
           '${DateFormat('d MMM').format(startOfWeek)} - ${DateFormat('d MMM').format(endOfWeek)}';
     }
@@ -456,6 +460,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   // ----------------------------------------------------------------
   Widget _buildNoDataWidget(BuildContext context) {
     String periodText;
+
     if (_selectedDuration == 'DAYS') {
       periodText = 'this week';
     } else if (_selectedDuration == 'MONTHS') {
@@ -465,43 +470,70 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     }
 
     final now = DateTime.now();
-    bool isCurrentPeriod =
-        (_selectedDuration == 'YEARS' && _currentDate.year == now.year) ||
-        (_selectedDuration == 'MONTHS' &&
-            _currentDate.year == now.year &&
-            _currentDate.month == now.month) ||
-        (_selectedDuration == 'DAYS' &&
-            _currentDate.isAfter(now.subtract(Duration(days: 7))) &&
-            _currentDate.isBefore(now.add(Duration(days: 1))));
 
-    return Column(
-      key: const ValueKey('noData'),
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'No service record $periodText.',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 6),
-        TextButton(
-          onPressed: isCurrentPeriod
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AddServiceRecordPage(),
-                    ),
-                  );
-                }
-              : null,
-          child: Text(
-            'Add Service Record Now',
-            style: TextStyle(
-              color: isCurrentPeriod ? Colors.blue : Colors.grey,
+    bool isCurrentPeriod = false;
+
+    if (_selectedDuration == 'YEARS') {
+      isCurrentPeriod = _currentDate.year == now.year;
+    }
+
+    if (_selectedDuration == 'MONTHS') {
+      isCurrentPeriod =
+          _currentDate.year == now.year && _currentDate.month == now.month;
+    }
+
+    if (_selectedDuration == 'DAYS') {
+      final startOfThisWeek = now.subtract(Duration(days: now.weekday - 1));
+      final endOfThisWeek = startOfThisWeek.add(const Duration(days: 6));
+
+      isCurrentPeriod =
+          _currentDate.isAfter(
+            startOfThisWeek.subtract(const Duration(seconds: 1)),
+          ) &&
+          _currentDate.isBefore(endOfThisWeek.add(const Duration(seconds: 1)));
+    }
+
+    return SizedBox.expand(
+      child: Center(
+        // <-- Centers your no-data message in available space
+        child: Column(
+          key: const ValueKey('noData'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'No service record $periodText.',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
+            const SizedBox(height: 10),
+
+            TextButton(
+              onPressed: isCurrentPeriod
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddServiceRecordPage(),
+                        ),
+                      );
+                    }
+                  : null,
+              child: Text(
+                'Add Service Record Now',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isCurrentPeriod ? Colors.blue : Colors.grey,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -512,49 +544,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     // 🧠 Handle no data case
     final hasData = monthlyEntries.any((entry) => entry.value > 0);
     if (!hasData) {
-      final msg = _selectedDuration == 'DAYS'
-          ? 'No service record this week.'
-          : _selectedDuration == 'MONTHS'
-          ? 'No service record this month.'
-          : 'No service record this year.';
-
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.info_outline, size: 60, color: Colors.grey),
-            const SizedBox(height: 10),
-            Text(
-              msg,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddServiceRecordPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
-              label: const Text(
-                'Add Service Record Now',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildNoDataWidget(context);
     }
 
     // 🧠 Correct X-axis label order
@@ -791,49 +781,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     final hasData = data.values.any((v) => v > 0);
 
     if (!hasData) {
-      final msg = _selectedDuration == 'DAYS'
-          ? 'No service record this week.'
-          : _selectedDuration == 'MONTHS'
-          ? 'No service record this month.'
-          : 'No service record this year.';
-
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.info_outline, size: 60, color: Colors.grey),
-            const SizedBox(height: 10),
-            Text(
-              msg,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddServiceRecordPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
-              label: const Text(
-                'Add Service Record Now',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildNoDataWidget(context);
     }
 
     // ✅ Existing Pie Chart (unchanged below)
