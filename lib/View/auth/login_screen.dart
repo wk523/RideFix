@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/HomePage.dart';
@@ -35,6 +36,11 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      final user = FirebaseAuth.instance.currentUser!;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
       ScaffoldMessenger.of(
         context,
@@ -43,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // ✅ Navigate to GuideScreen after successful login
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => HomePage(userDoc: userDoc)),
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Login failed';

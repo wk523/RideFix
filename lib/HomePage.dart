@@ -5,13 +5,12 @@ import 'package:ridefix/ServiceRecord/ServiceRecord.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
-
-void main() {
-  runApp(const HomePage());
-}
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final DocumentSnapshot userDoc;
+  const HomePage({super.key, required this.userDoc});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +22,7 @@ class HomePage extends StatelessWidget {
         fontFamily: 'Inter',
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: DashboardScreen(userDoc: userDoc),
     );
   }
 }
@@ -236,7 +235,9 @@ class ExpenseBar extends StatelessWidget {
 // --- 3. Navigation Drawer Widget (Left Panel) ---
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+  final DocumentSnapshot userDoc;
+
+  const AppDrawer({super.key, required this.userDoc});
 
   Widget _buildDrawerItem({
     required String title,
@@ -371,7 +372,7 @@ class AppDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => VehicleListPage(),
+                        builder: (context) => VehicleListPage(userDoc: userDoc),
                       ),
                     );
                   },
@@ -388,7 +389,8 @@ class AppDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ServiceRecordPage(),
+                        builder: (context) =>
+                            ServiceRecordPage(userDoc: userDoc),
                       ),
                     );
                   },
@@ -426,7 +428,8 @@ class AppDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ExpensesAnalyticsPage(),
+                        builder: (context) =>
+                            ExpensesAnalyticsPage(userDoc: userDoc),
                       ),
                     );
                   },
@@ -505,8 +508,39 @@ class AppDrawer extends StatelessWidget {
 
 // --- 4. Dashboard Screen (Main Content) ---
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+class DashboardScreen extends StatefulWidget {
+  final DocumentSnapshot userDoc;
+
+  const DashboardScreen({super.key, required this.userDoc});
+
+  @override
+  _DashboardScreenState createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  User? user;
+  bool loading = true;
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserData();
+  }
+
+  Future<void> loadUserData() async {
+    user = _auth.currentUser;
+
+    if (user != null) {
+      final doc = await _firestore.collection('users').doc(user!.uid).get();
+
+      setState(() {
+        loading = false;
+      });
+    }
+  }
 
   Widget _buildSectionHeader(
     String title, {
@@ -586,7 +620,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      drawer: const AppDrawer(), // Attach the custom drawer
+      drawer: AppDrawer(userDoc: widget.userDoc), // Attach the custom drawer
 
       body: CustomScrollView(
         slivers: [
@@ -664,7 +698,8 @@ class DashboardScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AddServiceRecordPage(),
+                            builder: (context) =>
+                                AddServiceRecordPage(userDoc: widget.userDoc),
                           ),
                         );
                       },

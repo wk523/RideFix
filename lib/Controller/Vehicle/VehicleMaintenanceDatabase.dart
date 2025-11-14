@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
@@ -13,7 +14,7 @@ class Vehicle {
   final String model;
   final String plateNumber;
   final String manYear;
-  final String userId;
+  final String uid;
   final String roadTaxExpired;
   final String mileage;
   final String imageUrl;
@@ -25,7 +26,7 @@ class Vehicle {
     required this.model,
     required this.plateNumber,
     required this.manYear,
-    required this.userId,
+    required this.uid,
     required this.roadTaxExpired,
     required this.mileage,
     required this.imageUrl,
@@ -40,7 +41,7 @@ class Vehicle {
       model: data['Model'] ?? '',
       plateNumber: data['Platenumber'] ?? '',
       manYear: data['Manyear'] ?? '',
-      userId: data['userid'] ?? '',
+      uid: data['uid'] ?? '',
       roadTaxExpired: data['Roadtaxexpired']?.toString() ?? '',
       mileage: data['mileage']?.toString() ?? '0',
       imageUrl: data['imageUrl'] ?? '',
@@ -55,7 +56,7 @@ class Vehicle {
       'Model': model,
       'Platenumber': plateNumber,
       'Manyear': manYear,
-      'userid': userId,
+      'uid': uid,
       'Roadtaxexpired': roadTaxExpired,
       'mileage': mileage,
       'imageUrl': imageUrl,
@@ -192,7 +193,7 @@ class VehicleDataService {
         model: vehicle.model.trim().toUpperCase(),
         plateNumber: vehicle.plateNumber.trim().toUpperCase(),
         manYear: vehicle.manYear.trim(),
-        userId: vehicle.userId,
+        uid: vehicle.uid,
         roadTaxExpired: vehicle.roadTaxExpired.trim(),
         mileage: vehicle.mileage.trim(),
         imageUrl: vehicle.imageUrl,
@@ -221,14 +222,16 @@ class VehicleDataService {
   }
 
   Stream<List<Vehicle>> get vehiclesStream {
-    return _firestore.collection('Vehicle').snapshots().map((snap) {
-      return snap.docs.map((d) => Vehicle.fromFirestore(d)).toList();
-    });
-  }
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
-  // -------------------------
-  // Upload a new image to Firebase Storage (reusable)
-  // -------------------------
+    return _firestore
+        .collection('Vehicle')
+        .where('uid', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
+          return snap.docs.map((d) => Vehicle.fromFirestore(d)).toList();
+        });
+  }
 
   /// Uploads raw image bytes to Firebase Storage under the 'vehicle_images' path
   /// and returns the public download URL.

@@ -51,7 +51,7 @@ class ServiceRecordDatabase {
   /// ✅ Add a new service record under the selected category
   /// ✅ Add a new service record (flat structure)
   Future<void> addServiceRecord({
-    required String userId,
+    required String uid,
     required String vehicleId,
     required String category,
     required double amount,
@@ -62,7 +62,7 @@ class ServiceRecordDatabase {
   }) async {
     try {
       final Map<String, dynamic> data = {
-        'userId': userId,
+        'uid': uid,
         'vehicleId': vehicleId,
         'category': category,
         'amount': amount,
@@ -86,12 +86,12 @@ class ServiceRecordDatabase {
 
   /// 🔥 REAL-TIME: Stream of records for a single category
   Stream<List<Map<String, dynamic>>> streamServiceRecordsByCategory({
-    required String userId,
+    required String uid,
     required String category,
   }) {
     return _firestore
         .collection('ServiceRecord')
-        .where('userId', isEqualTo: userId)
+        .where('uid', isEqualTo: uid)
         .where('category', isEqualTo: category)
         .orderBy('date', descending: true)
         .snapshots()
@@ -104,14 +104,14 @@ class ServiceRecordDatabase {
 
   /// 🔍 Get Firestore query stream with filters: category, date range, sort
   Stream<List<Map<String, dynamic>>> streamFilteredServiceRecords({
-    required String userId,
+    required String uid,
     String? category,
     DateTimeRange? dateRange,
     String sortBy = 'Date',
   }) {
     Query query = _firestore
         .collection('ServiceRecord')
-        .where('userId', isEqualTo: userId);
+        .where('uid', isEqualTo: uid);
 
     // Apply category filter
     if (category != null && category != 'All') {
@@ -148,10 +148,10 @@ class ServiceRecordDatabase {
   }
 
   /// 🔥 REAL-TIME: Stream of all service records (merged from all categories)
-  Stream<List<Map<String, dynamic>>> streamAllServiceRecords(String userId) {
+  Stream<List<Map<String, dynamic>>> streamAllServiceRecords(String uid) {
     return _firestore
         .collection('ServiceRecord')
-        .where('userId', isEqualTo: userId)
+        .where('uid', isEqualTo: uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map(

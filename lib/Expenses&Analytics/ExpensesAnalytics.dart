@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -5,7 +6,9 @@ import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase.d
 import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 
 class ExpensesAnalyticsPage extends StatefulWidget {
-  const ExpensesAnalyticsPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const ExpensesAnalyticsPage({super.key, required this.userDoc});
 
   @override
   State<ExpensesAnalyticsPage> createState() => _ExpensesAnalyticsPageState();
@@ -519,7 +522,8 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AddServiceRecordPage(),
+                          builder: (context) =>
+                              AddServiceRecordPage(userDoc: widget.userDoc),
                         ),
                       );
                     }

@@ -61,25 +61,7 @@ class MyApp extends StatelessWidget {
       home: const WelcomeScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomePage(),
-        '/vehicleList': (context) => VehicleListPage(),
-        '/vehicleRegister': (context) => VehicleRegistrationPage(),
-        '/vehicleDetails': (context) =>
-            VehicleDetailsPage(vehicleId: '', userId: ''),
-        '/updateVehicle': (context) => UpdateVehiclePage(
-          vehicleDetails: Vehicle(
-            vehicleId: '',
-            brand: '',
-            color: '',
-            model: '',
-            plateNumber: '',
-            manYear: '',
-            userId: '',
-            roadTaxExpired: '',
-            mileage: '',
-            imageUrl: '',
-          ),
-        ),
+        // '/home': (context) => const HomePage(),
         '/profile': (context) => const ProfileScreen(),
         '/guide': (context) => const TroubleshootingPage(),
         '/register': (context) => const RegisterScreen(),

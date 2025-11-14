@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
@@ -5,7 +7,9 @@ import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
 
 // --- Vehicle List Page Widget (Now Stateful) ---
 class VehicleListPage extends StatefulWidget {
-  const VehicleListPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const VehicleListPage({super.key, required this.userDoc});
 
   @override
   State<VehicleListPage> createState() => _VehicleListPageState();
@@ -131,7 +135,8 @@ class _VehicleListPageState extends State<VehicleListPage> {
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const VehicleRegistrationPage(),
+              builder: (context) =>
+                  VehicleRegistrationPage(userDoc: widget.userDoc),
             ),
           );
 
@@ -163,7 +168,10 @@ class VehicleListCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (context) => VehicleDetailsPage(
               vehicleId: vehicle.vehicleId,
-              userId: '', // ✅ This must not be empty
+              uid: FirebaseAuth
+                  .instance
+                  .currentUser!
+                  .uid, // ✅ This must not be empty
             ),
           ),
         );

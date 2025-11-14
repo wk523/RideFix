@@ -5,12 +5,12 @@ import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 
 class VehicleDetailsPage extends StatefulWidget {
   final String vehicleId;
-  final String userId;
+  final String uid;
 
   const VehicleDetailsPage({
     super.key,
     required this.vehicleId,
-    required this.userId,
+    required this.uid,
   });
 
   @override

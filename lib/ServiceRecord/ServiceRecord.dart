@@ -1,12 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:ridefix/Controller/ServiceRecord/ServiceRecordDatabase.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
 import 'package:ridefix/ServiceRecord/ServiceRecordDetails.dart';
 
 class ServiceRecordPage extends StatefulWidget {
-  const ServiceRecordPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const ServiceRecordPage({super.key, required this.userDoc});
 
   @override
   State<ServiceRecordPage> createState() => _ServiceRecordPageState();
@@ -17,47 +21,30 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
   List<String> selectedCategories = [];
   DateTimeRange? selectedDateRange;
   String? selectedVehicleId;
+  final ServiceRecordDatabase serviceDb = ServiceRecordDatabase();
 
-  final String userId = 'weikit523'; // Hardcoded for testing
   final VehicleDataService vehicleDataService = VehicleDataService();
+  late final String uid;
+
+  @override
+  void initState() {
+    super.initState();
+    uid = FirebaseAuth.instance.currentUser!.uid;
+  }
 
   // Map to store vehicleId -> vehicle name
   Map<String, String> vehicleNames = {};
 
-  Stream<QuerySnapshot> _getFilteredRecords() {
-    Query query = FirebaseFirestore.instance
-        .collection('ServiceRecord')
-        .where('userId', isEqualTo: userId);
+  Stream<List<Map<String, dynamic>>> _getFilteredRecords() {
+    return serviceDb.streamFilteredServiceRecords(
+      uid: uid,
+      category: selectedCategories.isEmpty
+          ? null
+          : (selectedCategories.length == 1 ? selectedCategories.first : null),
 
-    // Category filter
-    if (selectedCategories.isNotEmpty) {
-      query = query.where('category', whereIn: selectedCategories);
-    }
-
-    // Date range filter
-    if (selectedDateRange != null) {
-      final startDate = DateFormat(
-        'yyyy-MM-dd',
-      ).format(selectedDateRange!.start);
-      final endDate = DateFormat('yyyy-MM-dd').format(selectedDateRange!.end);
-      query = query
-          .where('date', isGreaterThanOrEqualTo: startDate)
-          .where('date', isLessThanOrEqualTo: endDate);
-    }
-
-    // Vehicle filter
-    if (selectedVehicleId != null && selectedVehicleId != 'All') {
-      query = query.where('vehicleId', isEqualTo: selectedVehicleId);
-    }
-
-    // Sorting
-    if (selectedSort == 'amount') {
-      query = query.orderBy('amount', descending: true);
-    } else if (selectedSort == 'date') {
-      query = query.orderBy('date', descending: true);
-    }
-
-    return query.snapshots();
+      dateRange: selectedDateRange,
+      sortBy: selectedSort == 'amount' ? 'Amount' : 'Date',
+    );
   }
 
   void _resetFilters() {
@@ -429,7 +416,8 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddServiceRecordPage(),
+              builder: (context) =>
+                  AddServiceRecordPage(userDoc: widget.userDoc),
             ),
           );
         },
@@ -512,19 +500,21 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
 
             // Service record list
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
+              child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _getFilteredRecords(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(
                       child: Text('No service records found.'),
                     );
                   }
 
-                  final records = snapshot.data!.docs;
+                  final records = snapshot.data!;
+
                   return Column(
                     children: [
                       Align(
@@ -538,25 +528,25 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                         ),
                       ),
                       const SizedBox(height: 5),
+
                       Expanded(
                         child: ListView.builder(
                           itemCount: records.length,
                           itemBuilder: (context, index) {
-                            final doc = records[index];
-                            final record = doc.data() as Map<String, dynamic>;
+                            final record = records[index];
 
-                            // Safely read fields from Firestore doc
+                            // Safely read fields
                             final category = (record['category'] ?? 'Unknown')
                                 .toString();
                             final date = (record['date'] ?? '-').toString();
                             final description = (record['description'] ?? '')
                                 .toString();
+
                             final amountNum =
                                 double.tryParse(
                                   record['amount']?.toString() ?? '',
                                 ) ??
                                 0.0;
-
                             final formattedAmount = amountNum.toStringAsFixed(
                               2,
                             );
@@ -594,20 +584,19 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                                       CircleAvatar(
                                         backgroundColor: Colors.blue.shade100,
                                         child: Icon(
-                                          _getCategoryIcon(
-                                            record['category'] ?? '',
-                                          ),
+                                          _getCategoryIcon(category),
                                           color: Colors.blue.shade700,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
+
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              record['category'] ?? 'Unknown',
+                                              category,
                                               style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,
@@ -615,7 +604,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              record['date'] ?? '-',
+                                              date,
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: Colors.grey[700],
@@ -624,6 +613,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                                           ],
                                         ),
                                       ),
+
                                       Padding(
                                         padding: const EdgeInsets.only(
                                           left: 12.0,

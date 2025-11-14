@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:typed_data';
@@ -6,7 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 
 class VehicleRegistrationPage extends StatefulWidget {
-  const VehicleRegistrationPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const VehicleRegistrationPage({super.key, required this.userDoc});
 
   @override
   State<VehicleRegistrationPage> createState() =>
@@ -335,7 +338,7 @@ class _VehicleRegistrationPageState extends State<VehicleRegistrationPage> {
         model: modelController.text.trim().toUpperCase(),
         plateNumber: plateController.text.trim().toUpperCase(),
         manYear: yearController.text.trim(),
-        userId: 'weikit523',
+        uid: FirebaseAuth.instance.currentUser!.uid,
         roadTaxExpired: roadTaxController.text.trim(),
         mileage: mileageController.text.trim(),
         imageUrl: imageUrl,

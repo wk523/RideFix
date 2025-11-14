@@ -1,5 +1,7 @@
 import 'dart:ui' as ui;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -70,7 +72,9 @@ extension ServiceCategoryExtension on ServiceCategory {
 }
 
 class AddServiceRecordPage extends StatefulWidget {
-  const AddServiceRecordPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const AddServiceRecordPage({super.key, required this.userDoc});
 
   @override
   State<AddServiceRecordPage> createState() => _AddServiceRecordPageState();
@@ -176,7 +180,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
   }
 
   Future<void> _saveRecord() async {
-    const userId = 'weikit523';
+    final uid = FirebaseAuth.instance.currentUser!.uid;
     if (_selectedVehicle == null) {
       ScaffoldMessenger.of(
         context,
@@ -241,7 +245,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
 
       // ✅ 3. Save service record
       await _serviceDb.addServiceRecord(
-        userId: userId,
+        uid: uid,
         vehicleId: _selectedVehicle!.vehicleId,
         category: category,
         amount: amount,
