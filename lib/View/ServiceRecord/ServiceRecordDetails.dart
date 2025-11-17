@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ridefix/ServiceRecord/FullScreenImage.dart';
+import 'package:ridefix/View/ServiceRecord/FullScreenImage.dart';
 
 class ServiceRecordDetailsPage extends StatelessWidget {
   final Map<String, dynamic> record;

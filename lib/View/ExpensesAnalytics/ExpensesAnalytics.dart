@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase.dart';
-import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
 
 class ExpensesAnalyticsPage extends StatefulWidget {
   final DocumentSnapshot userDoc;

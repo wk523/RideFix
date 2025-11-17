@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ridefix/Controller/ServiceRecord/ServiceRecordDatabase.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
-import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
-import 'package:ridefix/ServiceRecord/ServiceRecordDetails.dart';
+import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/View/ServiceRecord/ServiceRecordDetails.dart';
 
 class ServiceRecordPage extends StatefulWidget {
   final DocumentSnapshot userDoc;

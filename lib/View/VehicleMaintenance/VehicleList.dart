@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleDetails.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleRegistration.dart';
 
 // --- Vehicle List Page Widget (Now Stateful) ---
 class VehicleListPage extends StatefulWidget {

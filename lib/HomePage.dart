@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ridefix/Expenses&Analytics/ExpensesAnalytics.dart';
-import 'package:ridefix/ServiceRecord/AddServiceRecord.dart';
-import 'package:ridefix/ServiceRecord/ServiceRecord.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
+import 'package:ridefix/View/ExpensesAnalytics/ExpensesAnalytics.dart';
+import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/View/ServiceRecord/ServiceRecord.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';

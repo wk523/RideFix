@@ -11,10 +11,10 @@ import 'package:ridefix/view/auth/login_screen.dart';
 import 'package:ridefix/view/profile/profile_screen.dart';
 
 // Import vehicle maintenance modules
-import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
+import 'package:ridefix/View/VehicleMaintenance/UpdateVehicle.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleDetails.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleRegistration.dart';
 
 //Import troubleshooting
 import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
