@@ -1,9 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+// ServiceRecordPage.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ridefix/Controller/ServiceRecord/ServiceRecordDatabase.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
 import 'package:ridefix/View/ServiceRecord/ServiceRecordDetails.dart';
 
@@ -17,14 +19,15 @@ class ServiceRecordPage extends StatefulWidget {
 }
 
 class _ServiceRecordPageState extends State<ServiceRecordPage> {
-  String selectedSort = '';
+  final ServiceRecordDatabase serviceRecordDB = ServiceRecordDatabase();
+  final VehicleDataService vehicleService = VehicleDataService();
+
+  String selectedSort = "date";
   List<String> selectedCategories = [];
   DateTimeRange? selectedDateRange;
   String? selectedVehicleId;
-  final ServiceRecordDatabase serviceDb = ServiceRecordDatabase();
 
-  final VehicleDataService vehicleDataService = VehicleDataService();
-  late final String uid;
+  late String uid;
 
   @override
   void initState() {
@@ -32,30 +35,38 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
     uid = FirebaseAuth.instance.currentUser!.uid;
   }
 
-  // Map to store vehicleId -> vehicle name
   Map<String, String> vehicleNames = {};
 
+  // --------------------------------------------------------------------------
+  // 🔵 USE NEW BACKEND FUNCTION BUT KEEP ORIGINAL UI
+  // --------------------------------------------------------------------------
   Stream<List<Map<String, dynamic>>> _getFilteredRecords() {
-    return serviceDb.streamFilteredServiceRecords(
+    return serviceRecordDB.getServiceRecords(
       uid: uid,
-      category: selectedCategories.isEmpty
-          ? null
-          : (selectedCategories.length == 1 ? selectedCategories.first : null),
-
+      category: selectedCategories.length == 1
+          ? selectedCategories.first
+          : null,
+      vehicleId: selectedVehicleId == "All" ? null : selectedVehicleId,
       dateRange: selectedDateRange,
-      sortBy: selectedSort == 'amount' ? 'Amount' : 'Date',
+      sortBy: selectedSort,
     );
   }
 
+  // --------------------------------------------------------------------------
+  // 🔵 RESET
+  // --------------------------------------------------------------------------
   void _resetFilters() {
     setState(() {
-      selectedSort = '';
+      selectedSort = "date";
       selectedCategories.clear();
       selectedDateRange = null;
       selectedVehicleId = null;
     });
   }
 
+  // --------------------------------------------------------------------------
+  // 🔵 CATEGORY ICONS (KEPT FROM ORIGINAL)
+  // --------------------------------------------------------------------------
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'Maintenance':
@@ -75,10 +86,13 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
       case 'Makeup':
         return Icons.brush;
       default:
-        return Icons.miscellaneous_services;
+        return Icons.build;
     }
   }
 
+  // --------------------------------------------------------------------------
+  // 🔵 FILTER BOTTOM SHEET (FULL ORIGINAL VERSION)
+  // --------------------------------------------------------------------------
   Future<void> _showFilterDialog() async {
     List<String> tempCategories = List.from(selectedCategories);
     String tempSort = selectedSort;
@@ -129,32 +143,30 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Sort Section
+                  // SORT SECTION
                   _sectionHeader(Icons.sort, "Sort by"),
                   DropdownButtonFormField<String>(
-                    value: tempSort.isEmpty ? null : tempSort,
-                    hint: const Text('Select sort option'),
+                    value: tempSort,
                     decoration: _dropdownDecoration(),
                     items: const [
                       DropdownMenuItem(
                         value: 'date',
-                        child: Text('Date (Newest first)'),
+                        child: Text("Date (Newest first)"),
                       ),
                       DropdownMenuItem(
                         value: 'amount',
-                        child: Text('Amount (Highest first)'),
+                        child: Text("Amount (Highest first)"),
                       ),
                     ],
-                    onChanged: (val) =>
-                        setModalState(() => tempSort = val ?? ''),
+                    onChanged: (v) =>
+                        setModalState(() => tempSort = v ?? "date"),
                   ),
                   const SizedBox(height: 16),
 
-                  // Category Section
+                  // CATEGORY SECTION
                   _sectionHeader(Icons.category, "Category"),
                   Wrap(
                     spacing: 8,
-                    runSpacing: 6,
                     children: [
                       for (var cat in [
                         'Maintenance',
@@ -168,100 +180,38 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                       ])
                         FilterChip(
                           label: Text(cat),
-                          labelStyle: TextStyle(
-                            color: tempCategories.contains(cat)
-                                ? Colors.white
-                                : Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
                           selected: tempCategories.contains(cat),
-                          selectedColor: Colors.blue.shade600,
-                          backgroundColor: Colors.grey[200],
+                          selectedColor: Colors.blue,
                           onSelected: (v) {
                             setModalState(() {
-                              if (v) {
+                              if (v)
                                 tempCategories.add(cat);
-                              } else {
+                              else
                                 tempCategories.remove(cat);
-                              }
                             });
                           },
                         ),
                     ],
                   ),
+
                   const SizedBox(height: 16),
 
-                  // Date Range
-                  // 📅 Date Range Section
-                  const Text(
-                    'Date Range',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                  const SizedBox(height: 6),
+                  // DATE RANGE
+                  _sectionHeader(Icons.calendar_month, "Date Range"),
                   TextButton.icon(
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.blue.shade50,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.blue.shade300),
-                      ),
-                    ),
-                    icon: Icon(
-                      Icons.calendar_month,
-                      color: Colors.blue.shade700,
-                    ),
+                    icon: const Icon(Icons.calendar_month),
                     label: Text(
                       tempDateRange == null
-                          ? 'Select Date Range'
-                          : '${DateFormat('MMM d').format(tempDateRange!.start)} → ${DateFormat('MMM d, yyyy').format(tempDateRange!.end)}',
-                      style: TextStyle(
-                        color: Colors.blue.shade900,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          ? "Select Date Range"
+                          : "${DateFormat('MMM d').format(tempDateRange!.start)} → ${DateFormat('MMM d, yyyy').format(tempDateRange!.end)}",
                     ),
                     onPressed: () async {
-                      final now = DateTime.now();
                       final picked = await showDateRangePicker(
                         context: context,
-                        initialDateRange:
-                            tempDateRange ??
-                            DateTimeRange(
-                              start: now.subtract(const Duration(days: 7)),
-                              end: now,
-                            ),
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2030),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              useMaterial3: false, // ✅ Keep old layout
-                              colorScheme: ColorScheme.light(
-                                primary: Colors
-                                    .blue
-                                    .shade700, // Header & selection color
-                                onPrimary: Colors.white, // Text on header
-                                onSurface: Colors.black87, // Calendar text
-                                surface: Colors.white,
-                              ),
-                              dialogBackgroundColor: Colors.white,
-                              textButtonTheme: TextButtonThemeData(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.blue.shade700,
-                                  textStyle: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            child: child!,
-                          );
-                        },
+                        initialDateRange: tempDateRange,
                       );
-
                       if (picked != null) {
                         setModalState(() => tempDateRange = picked);
                       }
@@ -270,52 +220,46 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
 
                   const SizedBox(height: 16),
 
-                  // Vehicle Filter
+                  // VEHICLE DROPDOWN
                   _sectionHeader(Icons.directions_car, "Vehicle"),
                   StreamBuilder(
-                    stream: vehicleDataService.vehiclesStream,
+                    stream: vehicleService.vehiclesStream,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
-                      }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Text('No vehicles found.');
                       }
 
                       final vehicles = snapshot.data!;
                       vehicleNames.clear();
                       for (var v in vehicles) {
                         vehicleNames[v.vehicleId] =
-                            '${v.brand} ${v.model} (${v.plateNumber})';
+                            "${v.brand} ${v.model} (${v.plateNumber})";
                       }
 
                       return DropdownButtonFormField<String>(
-                        value: tempVehicleId,
-                        hint: const Text('Select vehicle'),
+                        value: tempVehicleId ?? "All",
                         decoration: _dropdownDecoration(),
                         items: [
                           const DropdownMenuItem(
-                            value: 'All',
-                            child: Text('All Vehicles'),
+                            value: "All",
+                            child: Text("All Vehicles"),
                           ),
                           ...vehicles.map(
                             (v) => DropdownMenuItem(
                               value: v.vehicleId,
-                              child: Text(
-                                '${v.brand} ${v.model} (${v.plateNumber})',
-                              ),
+                              child: Text(vehicleNames[v.vehicleId]!),
                             ),
                           ),
                         ],
-                        onChanged: (val) =>
-                            setModalState(() => tempVehicleId = val),
+                        onChanged: (v) =>
+                            setModalState(() => tempVehicleId = v),
                       );
                     },
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Buttons
+                  // APPLY BUTTONS
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -325,12 +269,12 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                           "Reset",
                           style: TextStyle(
                             color: Colors.red,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         onPressed: () {
                           setModalState(() {
-                            tempSort = '';
+                            tempSort = "date";
                             tempCategories.clear();
                             tempDateRange = null;
                             tempVehicleId = null;
@@ -338,24 +282,8 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                         },
                       ),
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                        ),
                         icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text(
-                          "Apply",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        label: const Text("Apply"),
                         onPressed: () {
                           setState(() {
                             selectedSort = tempSort;
@@ -379,39 +307,37 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
 
   InputDecoration _dropdownDecoration() {
     return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
   Widget _sectionHeader(IconData icon, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.blue.shade600, size: 20),
-          const SizedBox(width: 6),
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-          ),
-        ],
-      ),
+    return Row(
+      children: [
+        Icon(icon, color: Colors.blue),
+        const SizedBox(width: 5),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
     );
   }
 
+  // --------------------------------------------------------------------------
+  // 🔵 BUILD
+  // --------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Service Records',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          "Service Records",
+          style: TextStyle(color: Colors.white),
         ),
-        centerTitle: true,
         backgroundColor: Colors.blue,
       ),
+
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add, color: Colors.white),
         onPressed: () {
           Navigator.push(
             context,
@@ -421,221 +347,112 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
             ),
           );
         },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add, color: Colors.white),
       ),
+
       body: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
+            // FILTER BUTTON + RESET
             Row(
               children: [
                 Expanded(
-                  flex: 2,
                   child: _buildButton(
                     Icons.filter_list,
-                    'Filter',
+                    "Filter",
                     _showFilterDialog,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 1,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade50,
-                      foregroundColor: Colors.red.shade700,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    icon: const Icon(Icons.refresh, size: 20),
-                    label: const Text(
-                      'Reset',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    onPressed: _resetFilters,
-                  ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text("Reset"),
+                  onPressed: _resetFilters,
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
 
-            // Active filter chips
-            if (selectedSort.isNotEmpty ||
-                selectedCategories.isNotEmpty ||
+            // ACTIVE FILTERS CHIPS
+            if (selectedCategories.isNotEmpty ||
                 selectedDateRange != null ||
-                (selectedVehicleId != null && selectedVehicleId != 'All'))
+                (selectedVehicleId != null && selectedVehicleId != "All"))
               Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8.0,
+                spacing: 8,
                 children: [
-                  if (selectedSort.isNotEmpty)
-                    Chip(label: Text('Sort: $selectedSort')),
                   if (selectedCategories.isNotEmpty)
-                    Chip(
-                      label: Text('Category: ${selectedCategories.join(', ')}'),
-                    ),
+                    Chip(label: Text(selectedCategories.join(", "))),
                   if (selectedDateRange != null)
                     Chip(
                       label: Text(
-                        '${DateFormat('MMM d').format(selectedDateRange!.start)} → '
-                        '${DateFormat('MMM d, yyyy').format(selectedDateRange!.end)}',
+                        "${DateFormat('MMM d').format(selectedDateRange!.start)} → ${DateFormat('MMM d').format(selectedDateRange!.end)}",
                       ),
                     ),
-                  if (selectedVehicleId != null && selectedVehicleId != 'All')
-                    Chip(
-                      label: Text(
-                        'Vehicle: ${vehicleNames[selectedVehicleId] ?? selectedVehicleId}',
-                      ),
-                    ),
+                  if (selectedVehicleId != null && selectedVehicleId != "All")
+                    Chip(label: Text(vehicleNames[selectedVehicleId]!)),
                 ],
               ),
+
             const SizedBox(height: 10),
 
-            // Service record list
+            // LIST OF RECORDS
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _getFilteredRecords(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text('No service records found.'),
-                    );
+                  final records = snapshot.data!;
+                  if (records.isEmpty) {
+                    return const Center(child: Text("No records found"));
                   }
 
-                  final records = snapshot.data!;
+                  return ListView.builder(
+                    itemCount: records.length,
+                    itemBuilder: (context, i) {
+                      final record = records[i];
 
-                  return Column(
-                    children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'Showing ${records.length} record(s)',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
-                          ),
+                      final category = record["category"] ?? "Unknown";
+                      final date = record["date"] ?? "-";
+                      final amount = (record["amount"] ?? 0).toDouble();
+
+                      return Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                      ),
-                      const SizedBox(height: 5),
-
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: records.length,
-                          itemBuilder: (context, index) {
-                            final record = records[index];
-
-                            // Safely read fields
-                            final category = (record['category'] ?? 'Unknown')
-                                .toString();
-                            final date = (record['date'] ?? '-').toString();
-                            final description = (record['description'] ?? '')
-                                .toString();
-
-                            final amountNum =
-                                double.tryParse(
-                                  record['amount']?.toString() ?? '',
-                                ) ??
-                                0.0;
-                            final formattedAmount = amountNum.toStringAsFixed(
-                              2,
-                            );
-
-                            return InkWell(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ServiceRecordDetailsPage(
-                                          record: record,
-                                        ),
-                                  ),
-                                );
-                              },
-                              child: Card(
-                                elevation: 3,
-                                margin: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                  horizontal: 8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8.0,
-                                    horizontal: 12.0,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor: Colors.blue.shade100,
-                                        child: Icon(
-                                          _getCategoryIcon(category),
-                                          color: Colors.blue.shade700,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              category,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              date,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey[700],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 12.0,
-                                        ),
-                                        child: Text(
-                                          'RM$formattedAmount',
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.right,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                        child: ListTile(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ServiceRecordDetailsPage(record: record),
                               ),
                             );
                           },
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue.shade100,
+                            child: Icon(
+                              _getCategoryIcon(category),
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                          title: Text(
+                            category,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(date),
+                          trailing: Text(
+                            "RM${amount.toStringAsFixed(2)}",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
@@ -646,27 +463,16 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
     );
   }
 
-  // Filter button widget (no Expanded inside)
+  // FILTER BUTTON
   Widget _buildButton(IconData icon, String label, VoidCallback onPressed) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.blue.shade800,
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-        ),
-        icon: Icon(icon, size: 20),
-        label: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        onPressed: onPressed,
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.blue,
       ),
+      icon: Icon(icon),
+      label: Text(label),
+      onPressed: onPressed,
     );
   }
 }

@@ -1,3 +1,5 @@
+extra.set("desugar_jdk_libs_version", "2.2.0")
+
 allprojects {
     repositories {
         google()
