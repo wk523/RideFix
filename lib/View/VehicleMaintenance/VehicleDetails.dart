@@ -182,7 +182,10 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                   value: vehicle.plateNumber,
                 ),
                 DetailRow(label: 'Color', value: vehicle.color),
-                DetailRow(label: 'Manufacture Year', value: vehicle.manYear),
+                DetailRow(
+                  label: 'Manufacture Year',
+                  value: vehicle.manYear.toString(),
+                ),
                 DetailRow(label: 'Mileage', value: '${vehicle.mileage} km'),
                 DetailRow(
                   label: 'Road Tax Expiry',

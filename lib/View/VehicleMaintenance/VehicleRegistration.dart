@@ -310,6 +310,10 @@ class _VehicleRegistrationPageState extends State<VehicleRegistrationPage> {
     final vehicleId = DateTime.now().millisecondsSinceEpoch.toString();
     String imageUrl = '';
 
+    int safeParseInt(String text) {
+      return int.tryParse(text.trim()) ?? 0;
+    }
+
     try {
       if (_pickedImageBytes != null) {
         final plateForName = plateController.text.trim().isEmpty
@@ -337,10 +341,10 @@ class _VehicleRegistrationPageState extends State<VehicleRegistrationPage> {
         color: colorController.text.trim().toUpperCase(),
         model: modelController.text.trim().toUpperCase(),
         plateNumber: plateController.text.trim().toUpperCase(),
-        manYear: yearController.text.trim(),
+        manYear: safeParseInt(yearController.text),
         uid: FirebaseAuth.instance.currentUser!.uid,
         roadTaxExpired: roadTaxController.text.trim(),
-        mileage: mileageController.text.trim(),
+        mileage: safeParseInt(mileageController.text),
         imageUrl: imageUrl,
       );
 

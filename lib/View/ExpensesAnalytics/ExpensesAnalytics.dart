@@ -36,11 +36,15 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   List<MapEntry<String, double>> monthlyEntries = [];
   List<Map<String, dynamic>> topCategories = [];
 
-  final String userId = 'weikit523'; // Will Change to Authenticated User ID
+  late final String uid;
 
   @override
   void initState() {
     super.initState();
+
+    uid = widget.userDoc.id; // <-- Firestore document ID as UID
+    // uid = widget.userDoc['uid'];   // <-- Use this instead if your document stores uid field
+
     _updateCurrentPeriod();
     _loadAnalyticsData();
   }
@@ -81,13 +85,13 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     setState(() => _loading = true);
 
     final summary = await _db.fetchExpenseSummary(
-      userId: userId,
+      uid: uid,
       duration: _selectedDuration,
       referenceDate: _currentDate,
     );
 
     final categoryMap = await _db.fetchExpensesByCategory(
-      userId: userId,
+      uid: uid,
       duration: _selectedDuration,
       referenceDate: _currentDate,
     );
@@ -103,7 +107,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     final sortedCategories = categoryMap.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final tcoResult = await _db.predictTCO(userId: userId);
+    final tcoResult = await _db.predictTCO(uid: uid);
     final predictedNextTCO = tcoResult['predictedTotal'] ?? 0.0;
 
     if (mounted) {
@@ -438,11 +442,7 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
             _totalExpenses,
           ),
           if (_selectedDuration == 'YEARS')
-            _buildSummaryRow(
-              Icons.trending_up,
-              'Predicted Next Year Cost (TCO)',
-              tco,
-            ),
+            _buildSummaryRow(Icons.trending_up, 'TCO (Next Year)', tco),
 
           const SizedBox(height: 6),
           Center(

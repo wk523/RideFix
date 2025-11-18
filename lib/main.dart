@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
 import 'package:ridefix/HomePage.dart';
 import 'package:ridefix/Services/notification_service.dart';
+import 'package:ridefix/View/Fuel&MileageAnalytics/AddFuelEntry.dart';
 import 'package:ridefix/View/auth/register_screen.dart';
 
 // Import RideFX onboarding and login pages

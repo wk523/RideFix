@@ -2,19 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class ExpensesAnalyticsDatabase {
-  final CollectionReference _records =
-      FirebaseFirestore.instance.collection('ServiceRecord');
+  final CollectionReference _records = FirebaseFirestore.instance.collection(
+    'ServiceRecord',
+  );
 
   /// Returns summary by selected duration:
   /// 'DAYS'  -> group by day (Mon..Sun)
   /// 'MONTHS'-> group by week (Week 1..Week N)
   /// 'YEARS' -> group by month (Jan..Dec)
   Future<Map<String, dynamic>> fetchExpenseSummary({
-    required String userId,
+    required String uid,
     required String duration,
     required DateTime referenceDate, // ✅ Added parameter
   }) async {
-    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+    final snapshot = await _records.where('uid', isEqualTo: uid).get();
 
     final Map<String, double> groupedTotals = {};
 
@@ -23,7 +24,9 @@ class ExpensesAnalyticsDatabase {
     late DateTime endDate;
 
     if (duration == 'DAYS') {
-      startDate = referenceDate.subtract(Duration(days: referenceDate.weekday - 1));
+      startDate = referenceDate.subtract(
+        Duration(days: referenceDate.weekday - 1),
+      );
       endDate = startDate.add(const Duration(days: 6));
     } else if (duration == 'MONTHS') {
       startDate = DateTime(referenceDate.year, referenceDate.month, 1);
@@ -71,15 +74,29 @@ class ExpensesAnalyticsDatabase {
         groupedTotals.putIfAbsent(d, () => 0.0);
       }
     } else if (duration == 'MONTHS') {
-      final daysInMonth = DateTime(referenceDate.year, referenceDate.month + 1, 0).day;
+      final daysInMonth = DateTime(
+        referenceDate.year,
+        referenceDate.month + 1,
+        0,
+      ).day;
       final weeksInMonth = ((daysInMonth - 1) ~/ 7) + 1;
       for (var i = 1; i <= weeksInMonth; i++) {
         groupedTotals.putIfAbsent('Week $i', () => 0.0);
       }
     } else {
       for (final m in [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ]) {
         groupedTotals.putIfAbsent(m, () => 0.0);
       }
@@ -89,8 +106,10 @@ class ExpensesAnalyticsDatabase {
     final bucketCount = duration == 'DAYS'
         ? 7
         : duration == 'MONTHS'
-            ? ((DateTime(referenceDate.year, referenceDate.month + 1, 0).day - 1) ~/ 7) + 1
-            : 12;
+        ? ((DateTime(referenceDate.year, referenceDate.month + 1, 0).day - 1) ~/
+                  7) +
+              1
+        : 12;
     final average = bucketCount > 0 ? total / bucketCount : 0.0;
     final tco = average * 6;
 
@@ -106,8 +125,18 @@ class ExpensesAnalyticsDatabase {
           return ai.compareTo(bi);
         } else {
           const months = {
-            'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-            'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+            'Jan': 1,
+            'Feb': 2,
+            'Mar': 3,
+            'Apr': 4,
+            'May': 5,
+            'Jun': 6,
+            'Jul': 7,
+            'Aug': 8,
+            'Sep': 9,
+            'Oct': 10,
+            'Nov': 11,
+            'Dec': 12,
           };
           return (months[a] ?? 0).compareTo(months[b] ?? 0);
         }
@@ -125,10 +154,8 @@ class ExpensesAnalyticsDatabase {
 
   /// 🔮 Predicts future total cost (TCO) for next 6 months
   /// using linear regression based on historical monthly totals.
-  Future<Map<String, dynamic>> predictTCO({
-    required String userId,
-  }) async {
-    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+  Future<Map<String, dynamic>> predictTCO({required String uid}) async {
+    final snapshot = await _records.where('uid', isEqualTo: uid).get();
 
     // Step 1: Build monthly totals (past 12 months)
     final Map<String, double> monthlyTotals = {};
@@ -154,18 +181,18 @@ class ExpensesAnalyticsDatabase {
     }
 
     if (monthlyTotals.isEmpty) {
-      return {
-        'predictedTotal': 0.0,
-        'monthlyProjection': List.filled(6, 0.0),
-      };
+      return {'predictedTotal': 0.0, 'monthlyProjection': List.filled(6, 0.0)};
     }
 
     // Step 2: Sort months chronologically
-    final sortedKeys = monthlyTotals.keys.toList()..sort((a, b) => a.compareTo(b));
+    final sortedKeys = monthlyTotals.keys.toList()
+      ..sort((a, b) => a.compareTo(b));
     final values = sortedKeys.map((k) => monthlyTotals[k]!).toList();
 
     // Step 3: Keep only last 12 months
-    final recentValues = values.length > 12 ? values.sublist(values.length - 12) : values;
+    final recentValues = values.length > 12
+        ? values.sublist(values.length - 12)
+        : values;
     final n = recentValues.length;
 
     // Step 4: Linear regression
@@ -194,18 +221,20 @@ class ExpensesAnalyticsDatabase {
 
   /// Returns a Map<Category, sumAmount> filtered by duration (for PieChart)
   Future<Map<String, double>> fetchExpensesByCategory({
-    required String userId,
+    required String uid,
     required String duration,
     required DateTime referenceDate, // ✅ Added parameter
   }) async {
-    final snapshot = await _records.where('userId', isEqualTo: userId).get();
+    final snapshot = await _records.where('uid', isEqualTo: uid).get();
     final Map<String, double> map = {};
 
     late DateTime startDate;
     late DateTime endDate;
 
     if (duration == 'DAYS') {
-      startDate = referenceDate.subtract(Duration(days: referenceDate.weekday - 1));
+      startDate = referenceDate.subtract(
+        Duration(days: referenceDate.weekday - 1),
+      );
       endDate = startDate.add(const Duration(days: 6));
     } else if (duration == 'MONTHS') {
       startDate = DateTime(referenceDate.year, referenceDate.month, 1);

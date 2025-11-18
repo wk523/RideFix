@@ -38,8 +38,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     modelController = TextEditingController(text: v.model);
     plateController = TextEditingController(text: v.plateNumber);
     colorController = TextEditingController(text: v.color);
-    yearController = TextEditingController(text: v.manYear);
-    mileageController = TextEditingController(text: v.mileage);
+    yearController = TextEditingController(text: v.manYear.toString());
+    mileageController = TextEditingController(text: v.mileage.toString());
     roadTaxController = TextEditingController(text: v.roadTaxExpired);
     previewUrl = v.imageUrl;
     oldImageUrl = v.imageUrl;
@@ -82,6 +82,10 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
 
     setState(() => _isLoading = true);
 
+    int safeParseInt(String text) {
+      return int.tryParse(text.trim()) ?? 0;
+    }
+
     try {
       final updatedVehicle = Vehicle(
         vehicleId: widget.vehicleDetails.vehicleId,
@@ -89,10 +93,10 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
         color: colorController.text.trim().toUpperCase(),
         model: modelController.text.trim().toUpperCase(),
         plateNumber: plateController.text.trim().toUpperCase(),
-        manYear: yearController.text.trim(),
+        manYear: safeParseInt(yearController.text),
         uid: widget.vehicleDetails.uid,
         roadTaxExpired: roadTaxController.text.trim(),
-        mileage: mileageController.text.trim(),
+        mileage: safeParseInt(mileageController.text),
         imageUrl: oldImageUrl ?? '',
       );
 

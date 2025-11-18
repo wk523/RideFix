@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridefix/View/ExpensesAnalytics/ExpensesAnalytics.dart';
+import 'package:ridefix/View/Fuel&MileageAnalytics/AddFuelEntry.dart';
 import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
 import 'package:ridefix/View/ServiceRecord/ServiceRecord.dart';
 import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
@@ -416,7 +417,15 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Fuel Tracking',
                   icon: Icons.local_gas_station_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AddFuelEntryPage(userDoc: userDoc),
+                      ),
+                    );
+                  },
                 ),
 
                 // Analytics & Help

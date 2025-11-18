@@ -13,10 +13,10 @@ class Vehicle {
   final String color;
   final String model;
   final String plateNumber;
-  final String manYear;
+  final int manYear;
   final String uid;
   final String roadTaxExpired;
-  final String mileage;
+  final int mileage;
   final String imageUrl;
 
   Vehicle({
@@ -34,16 +34,24 @@ class Vehicle {
 
   factory Vehicle.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    int safeParseInt(dynamic value, {int defaultValue = 0}) {
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return Vehicle(
-      vehicleId: data['Vehicleid'] ?? doc.id, // ✅ fallback to doc.id
+      vehicleId: data['Vehicleid'] ?? doc.id,
       brand: data['Brand'] ?? '',
       color: data['Color'] ?? '',
       model: data['Model'] ?? '',
       plateNumber: data['Platenumber'] ?? '',
-      manYear: data['Manyear'] ?? '',
+      manYear: safeParseInt(data['Manyear']),
       uid: data['uid'] ?? '',
-      roadTaxExpired: data['Roadtaxexpired']?.toString() ?? '',
-      mileage: data['mileage']?.toString() ?? '0',
+      roadTaxExpired: data['Roadtaxexpired'] ?? '',
+      mileage: safeParseInt(data['mileage']),
       imageUrl: data['imageUrl'] ?? '',
     );
   }
@@ -82,18 +90,19 @@ class VehicleDataService {
       return 'Color must contain only alphabets.';
     }
 
-    final yearPattern = RegExp(r'^\d{4}$');
-    if (!yearPattern.hasMatch(vehicle.manYear)) {
+    // 🔥 Validation updated for manYear (now an int)
+    final year = vehicle.manYear;
+    if (year.toString().length != 4) {
+      // Check if the number is four digits (e.g., prevents single-digit years)
       return 'Manufacture Year must be 4 digits.';
     }
-    final year = int.tryParse(vehicle.manYear) ?? 0;
     if (year < 1900 || year > DateTime.now().year + 1) {
       return 'Manufacture Year must be between 1900 and ${DateTime.now().year + 1}.';
     }
 
-    final mileagePattern = RegExp(r'^\d+$');
-    if (!mileagePattern.hasMatch(vehicle.mileage)) {
-      return 'Mileage must contain only numbers.';
+    // 🔥 Validation updated for mileage (now an int)
+    if (vehicle.mileage < 0) {
+      return 'Mileage cannot be negative.';
     }
 
     return null;
@@ -168,7 +177,7 @@ class VehicleDataService {
   // -------------------------
   // Update Vehicle Mileage
   // -------------------------
-  Future<void> updateVehicleMileage(String vehicleId, double newMileage) async {
+  Future<void> updateVehicleMileage(String vehicleId, int newMileage) async {
     await _firestore.collection('Vehicle').doc(vehicleId).update({
       'mileage': newMileage,
     });
@@ -192,10 +201,10 @@ class VehicleDataService {
         color: vehicle.color.trim().toUpperCase(),
         model: vehicle.model.trim().toUpperCase(),
         plateNumber: vehicle.plateNumber.trim().toUpperCase(),
-        manYear: vehicle.manYear.trim(),
+        manYear: vehicle.manYear,
         uid: vehicle.uid,
         roadTaxExpired: vehicle.roadTaxExpired.trim(),
-        mileage: vehicle.mileage.trim(),
+        mileage: vehicle.mileage,
         imageUrl: vehicle.imageUrl,
       );
 

@@ -215,14 +215,17 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       // ✅ 2. Handle mileage validation + update (only for maintenance)
       if (_extraFormData.containsKey('mileage')) {
         final enteredMileageText = _extraFormData['mileage']?.toString().trim();
-        final currentMileage = double.tryParse(
-          _selectedVehicle?.mileage ?? '0',
-        );
+
+        // 1. Get current mileage as an int (it's now an int in the Vehicle model)
+        // Use ?? 0 for safety, as '0' is not needed after the type change.
+        final currentMileage = _selectedVehicle?.mileage ?? 0;
 
         if (enteredMileageText != null && enteredMileageText.isNotEmpty) {
-          final enteredMileage = double.tryParse(enteredMileageText);
+          // 2. Parse the entered text directly to an int
+          final enteredMileage = int.tryParse(enteredMileageText);
 
-          if (enteredMileage != null && currentMileage != null) {
+          // 3. Compare the integer values
+          if (enteredMileage != null) {
             if (enteredMileage < currentMileage) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -234,12 +237,16 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
               setState(() => _isSaving = false);
               return;
             } else if (enteredMileage > currentMileage) {
+              // 4. Update the service function call
+              // The updateVehicleMileage function now expects an int.
               await VehicleDataService().updateVehicleMileage(
                 _selectedVehicle!.vehicleId,
-                enteredMileage,
+                enteredMileage, // Passed as int
               );
             }
           }
+          // Note: If enteredMileage is null (invalid format), it skips the logic,
+          // assuming validation handles the initial input formatting error elsewhere.
         }
       }
 
