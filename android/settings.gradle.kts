@@ -17,9 +17,18 @@ pluginManagement {
     }
 }
 
+dependencyResolutionManagement {
+    extra.set("flutter", mapOf(
+    "compileSdkVersion" to 34,
+    "minSdkVersion" to 21,
+    "targetSdkVersion" to 34
+))
+}
+
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "8.9.1" apply false
+    // Update AGP version to 8.13.0
+    id("com.android.application") version "8.13.0" apply false 
     // START: FlutterFire Configuration
     id("com.google.gms.google-services") version("4.3.15") apply false
     // END: FlutterFire Configuration

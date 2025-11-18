@@ -1,26 +1,26 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.ridefix"
-    compileSdk = flutter.compileSdkVersion
+    
+    // This correctly references the compileSdkVersion
+    compileSdk = flutter.compileSdkVersion 
+    
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -50,9 +50,6 @@ flutter {
 }
 
 dependencies {
-
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-
-
     implementation("androidx.multidex:multidex:2.0.1")
 }

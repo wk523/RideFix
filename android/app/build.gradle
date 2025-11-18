@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+    // START: FlutterFire Configuration
+    id 'com.google.gms.google-services'
+    // END: FlutterFire Configuration
+    id 'kotlin-android'
+    id 'dev.flutter.flutter-gradle-plugin'
+}
+
+android {
+    namespace 'com.example.ridefix'
+    
+    // Kotlin DSL uses compileSdk = flutter.compileSdkVersion
+    // Groovy DSL uses compileSdkVersion flutter.compileSdkVersion
+    compileSdkVersion flutter.compileSdkVersion
+    
+    // Note: ndkVersion is a string in Groovy DSL
+    ndkVersion '27.0.12077973'
+
+    compileOptions {
+        // Kotlin DSL uses isCoreLibraryDesugaringEnabled = true
+        // Groovy DSL uses coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled true
+        
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    defaultConfig {
+        applicationId 'com.example.ridefix'
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        
+        // Use .toInteger() instead of .toInt() for Groovy
+        versionCode flutter.versionCode.toInteger()
+        versionName flutter.versionName
+        
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.getByName('debug')
+            minifyEnabled false
+            shrinkResources false
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    // Note the function call syntax for dependency definitions
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation 'androidx.multidex:multidex:2.0.1'
+}
