@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:ridefix/controller/maintenance_reminder_controller.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
 import 'package:ridefix/view/maintenance/edit_reminder_form_page.dart';
@@ -12,241 +13,108 @@ class EditActiveReminderPage extends StatefulWidget {
 }
 
 class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
-  Timer? _refreshTimer;
-  final controller = MaintenanceReminderController();
+  final _controller = MaintenanceReminderController();
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    // Refresh UI every 30 seconds to update time remaining
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) {
-        setState(() {});
-      }
+    // Refresh every second for countdown
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
-  // Helper to calculate time remaining
-  String _getTimeRemaining(String dateExpired, String timeExpired) {
-    try {
-      final reminderDate = DateTime.parse(dateExpired);
-      // Parse time
-      TimeOfDay timeOfDay;
+  // convert UTC instant -> Malaysia local
+  DateTime _toMalaysiaLocal(DateTime utcInstant) => utcInstant.toUtc().add(const Duration(hours: 8));
 
-      if (timeExpired.contains('AM') || timeExpired.contains('PM')) {
-        final isPM = timeExpired.contains('PM');
-        final timeWithoutPeriod = timeExpired.replaceAll(RegExp(r'[AP]M'), '').trim();
-        final parts = timeWithoutPeriod.split(':');
-        int hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
+  // Countdown and colors operate on UTC to avoid timezone issues
+  String _countDown(DateTime dueUtc) {
+    final diff = dueUtc.difference(DateTime.now().toUtc());
+    if (diff.isNegative) return "Expired";
 
-        if (isPM && hour != 12) {
-          hour += 12;
-        } else if (!isPM && hour == 12) {
-          hour = 0;
-        }
+    final d = diff.inDays;
+    final h = diff.inHours % 24;
+    final m = diff.inMinutes % 60;
+    final s = diff.inSeconds % 60;
 
-        timeOfDay = TimeOfDay(hour: hour, minute: minute);
-      } else {
-        final parts = timeExpired.split(':');
-        timeOfDay = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-      }
-
-      final reminderDateTime = DateTime(
-        reminderDate.year,
-        reminderDate.month,
-        reminderDate.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
-
-      final difference = reminderDateTime.difference(DateTime.now());
-
-      if (difference.isNegative) return 'Expired';
-      if (difference.inDays > 0) return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} left';
-      if (difference.inHours > 0) return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} left';
-      if (difference.inMinutes > 0) return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} left';
-
-      return 'Less than a minute';
-    } catch (e) {
-      return 'Invalid date';
-    }
+    return "${d}d ${h}h ${m}m ${s}s";
   }
 
-  // Color matches the time remaining
-  Color _getTimeRemainingColor(String dateExpired, String timeExpired) {
-    try {
-      final reminderDate = DateTime.parse(dateExpired);
-      TimeOfDay timeOfDay;
-
-      if (timeExpired.contains('AM') || timeExpired.contains('PM')) {
-        final isPM = timeExpired.contains('PM');
-        final timeWithoutPeriod = timeExpired.replaceAll(RegExp(r'[AP]M'), '').trim();
-        final parts = timeWithoutPeriod.split(':');
-        int hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-
-        if (isPM && hour != 12) {
-          hour += 12;
-        } else if (!isPM && hour == 12) {
-          hour = 0;
-        }
-
-        timeOfDay = TimeOfDay(hour: hour, minute: minute);
-      } else {
-        final parts = timeExpired.split(':');
-        timeOfDay = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-      }
-
-      final reminderDateTime = DateTime(
-        reminderDate.year,
-        reminderDate.month,
-        reminderDate.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
-
-      final difference = reminderDateTime.difference(DateTime.now());
-
-      if (difference.isNegative) return Colors.red;
-      if (difference.inHours < 24) return Colors.orange;
-      if (difference.inDays < 7) return Colors.blue;
-      return Colors.green;
-    } catch (e) {
-      return Colors.grey;
-    }
+  Color _timeColor(DateTime dueUtc) {
+    final diff = dueUtc.difference(DateTime.now().toUtc());
+    if (diff.isNegative) return Colors.red;
+    if (diff.inHours < 24) return Colors.orange;
+    if (diff.inDays < 7) return Colors.blue;
+    return Colors.green;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Active Reminders'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: () => setState(() {}),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Edit Active Reminders')),
       body: StreamBuilder<List<MaintenanceReminderModel>>(
-        stream: controller.getActiveReminders(),
+        stream: _controller.getActiveReminders(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error: ${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-              ),
-            );
-          }
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final reminders = snapshot.data!;
+          if (reminders.isEmpty) return const Center(child: Text("No active reminders."));
 
-          final reminders = snapshot.data ?? [];
-          if (reminders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No active reminders found.',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'All your reminders have expired or\nyou haven\'t created any yet.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            );
-          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final r = reminders[index];
+              final dueMalaysia = _toMalaysiaLocal(r.dueDateTime);
+              final color = _timeColor(r.dueDateTime);
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              setState(() {});
-              await Future.delayed(const Duration(milliseconds: 500));
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  leading: CircleAvatar(
+                    backgroundColor: color.withOpacity(0.2),
+                    child: Icon(Icons.timer, color: color),
+                  ),
+                  title: Text(r.maintenanceType, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text("Due: ${DateFormat('yyyy-MM-dd HH:mm').format(dueMalaysia)} (MYT)"),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _countDown(r.dueDateTime),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: color),
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => EditReminderFormPage(reminder: r)),
+                      );
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+              );
             },
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: reminders.length,
-              itemBuilder: (context, index) {
-                final reminder = reminders[index];
-                final timeRemaining = _getTimeRemaining(reminder.dateExpired, reminder.timeExpired);
-                final timeColor = _getTimeRemainingColor(reminder.dateExpired, reminder.timeExpired);
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  elevation: 2,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: timeColor.withOpacity(0.2),
-                      child: Icon(Icons.notifications_active, color: timeColor),
-                    ),
-                    title: Text(
-                      reminder.maintenanceType,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          'Due: ${reminder.dateExpired} at ${reminder.timeExpired}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: timeColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: timeColor.withOpacity(0.3), width: 1),
-                          ),
-                          child: Text(
-                            timeRemaining,
-                            style: TextStyle(fontSize: 12, color: timeColor, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => EditReminderFormPage(reminder: reminder)),
-                        );
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
           );
         },
       ),

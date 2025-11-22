@@ -27,13 +27,12 @@ class _SetReminderViewState extends State<SetReminderView> {
     final picked = await showDatePicker(
       context: context,
       initialDate: now,
-      firstDate: now, // Prevent past dates
+      firstDate: now,
       lastDate: DateTime(2100),
     );
 
     if (picked != null) setState(() => _selectedDate = picked);
   }
-
 
   Future<void> _selectTime() async {
     final now = TimeOfDay.now();
@@ -43,9 +42,7 @@ class _SetReminderViewState extends State<SetReminderView> {
     );
 
     if (picked != null) {
-      // If date is today, prevent selecting a past time
       if (_selectedDate != null) {
-        final today = DateTime.now();
         final selectedDateTime = DateTime(
           _selectedDate!.year,
           _selectedDate!.month,
@@ -54,18 +51,21 @@ class _SetReminderViewState extends State<SetReminderView> {
           picked.minute,
         );
 
-        if (selectedDateTime.isBefore(today)) {
+        // 检查时间（Malaysia 时间）
+        final nowMalaysia = DateTime.now().toUtc().add(const Duration(hours: 8));
+        final malaysiaDt = selectedDateTime.add(const Duration(hours: 8));
+
+        if (malaysiaDt.isBefore(nowMalaysia)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Cannot select a past time')),
           );
-          return; // Don't set the time
+          return;
         }
       }
 
       setState(() => _selectedTime = picked);
     }
   }
-
 
   Future<void> _saveReminder() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -78,16 +78,40 @@ class _SetReminderViewState extends State<SetReminderView> {
       return;
     }
 
-    final reminder = MaintenanceReminderModel(
-      id: '',
-      userId: user.uid,
-      maintenanceType: _selectedCategory!,
-      dateExpired: DateFormat('yyyy-MM-dd').format(_selectedDate!),
-      timeExpired: _selectedTime!.format(context),
-      status: 'active',
+    // 用户选择的时间（Malaysia UTC+8）
+    final selectedHour = _selectedTime!.hour;
+    final selectedMinute = _selectedTime!.minute;
+
+    // 创建 Malaysia 时间
+    final malaysiaDt = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      selectedHour,
+      selectedMinute,
     );
 
 
+    final utcDateTime = malaysiaDt.subtract(const Duration(hours: 8));
+
+    ;
+
+    // 再次检查时间
+    final nowMalaysia = DateTime.now().toUtc().add(const Duration(hours: 8));
+    if (malaysiaDt.isBefore(nowMalaysia)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot select a past time')),
+      );
+      return;
+    }
+
+    final reminder = MaintenanceReminderModel(
+      userId: user.uid,
+      maintenanceType: _selectedCategory!,
+      dueDateTime: utcDateTime,
+      createdAt: DateTime.now().toUtc(),
+      status: 'active',
+    );
 
     await _controller.addReminder(reminder);
 

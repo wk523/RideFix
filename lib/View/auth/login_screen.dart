@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+import 'package:ridefix/View/parking/parking_main_page.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
 import 'package:ridefix/View/troubleshoot/qna_list_view.dart';
 import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
-import '/widgets/custom_textfield.dart';
+import 'package:ridefix/View/workshop/workshop_locator_page.dart';
+import 'package:ridefix/widgets/custom_textfield.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -42,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // ✅ Navigate to GuideScreen after successful login
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => MaintenanceMainView()),
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
 
     } on FirebaseAuthException catch (e) {

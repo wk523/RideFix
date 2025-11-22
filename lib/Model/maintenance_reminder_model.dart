@@ -4,40 +4,39 @@ class MaintenanceReminderModel {
   final String id;
   final String userId;
   final String maintenanceType;
-  final String dateExpired;
-  final String timeExpired;
+  final DateTime dueDateTime;
+  final DateTime createdAt;
   final String status;
 
   MaintenanceReminderModel({
-    required this.id,
+    this.id = '', // Document ID (optional for creation)
     required this.userId,
     required this.maintenanceType,
-    required this.dateExpired,
-    required this.timeExpired,
-    this.status = 'active',
+    required this.dueDateTime,
+    required this.createdAt,
+    required this.status,
   });
 
-  /// ✅ Correct Firestore map
+  /// Convert model to Firestore map
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
       'maintenanceType': maintenanceType,
-      'dateExpired': dateExpired,
-      'timeExpired': timeExpired,
-      'status': status.isNotEmpty ? status : 'active',
-      'createdAt': FieldValue.serverTimestamp(),
+      'dueDateTime': Timestamp.fromDate(dueDateTime), // Stored in UTC
+      'createdAt': Timestamp.fromDate(createdAt),     // Stored in UTC
+      'status': status,
     };
   }
 
-  /// ✅ For reading from Firestore
-  factory MaintenanceReminderModel.fromMap(Map<String, dynamic> data, String id) {
+  /// Create model instance from Firestore data
+  factory MaintenanceReminderModel.fromMap(String id, Map<String, dynamic> map) {
     return MaintenanceReminderModel(
-      id: id,
-      userId: data['userId'] ?? '',
-      maintenanceType: data['maintenanceType'] ?? '',
-      dateExpired: data['dateExpired'] ?? '',
-      timeExpired: data['timeExpired'] ?? '',
-      status: data['status'] ?? 'active',
+      id: id, // Firestore document ID
+      userId: map['userId'],
+      maintenanceType: map['maintenanceType'],
+      dueDateTime: (map['dueDateTime'] as Timestamp).toDate(),
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      status: map['status'] ?? 'active',
     );
   }
 }

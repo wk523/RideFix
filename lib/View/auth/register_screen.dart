@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridefix/controller/auth_controller.dart';
-import '/widgets/custom_textfield.dart';
+import 'package:ridefix/widgets/custom_textfield.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,6 +11,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();            // <- 新增
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -29,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await _authController.registerUser(
         emailController.text.trim(),
         passwordController.text.trim(),
+        nameController.text.trim(),            // <- 新增传入 name
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,12 +59,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 Image.asset('assets/icons/ridefx_logo.png', height: 100),
                 const SizedBox(height: 16),
-                const Text("Welcome to RideFX",
-                    style:
-                    TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const Text("Register your account!",
-                    style: TextStyle(color: Colors.grey)),
+                const Text(
+                  "Welcome to RideFX",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const Text(
+                  "Register your account!",
+                  style: TextStyle(color: Colors.grey),
+                ),
                 const SizedBox(height: 32),
+
+                // --------------------- 新增 Name 输入栏 ---------------------
+                CustomTextField(
+                  controller: nameController,
+                  hintText: "Full Name",
+                  icon: Icons.person_outline,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // --------------------- Email ---------------------
                 CustomTextField(
                   controller: emailController,
                   hintText: "Email",
@@ -77,6 +98,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+
+                // --------------------- Password ---------------------
                 CustomTextField(
                   controller: passwordController,
                   hintText: "Password",
@@ -98,6 +121,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+
+                // --------------------- Confirm Password ---------------------
                 CustomTextField(
                   controller: confirmPasswordController,
                   hintText: "Confirm Password",
@@ -120,12 +145,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
+
+                // --------------------- Register Button ---------------------
                 ElevatedButton(
                   onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 60),
+                    padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 60),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),
@@ -143,6 +170,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 16),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

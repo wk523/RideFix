@@ -13,328 +13,149 @@ class EditReminderFormPage extends StatefulWidget {
 
 class _EditReminderFormPageState extends State<EditReminderFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final MaintenanceReminderController _controller = MaintenanceReminderController();
+  final _controller = MaintenanceReminderController();
 
   final List<String> _categories = [
     'Fuel', 'Maintenance', 'Car Wash', 'Insurance', 'Road Tax', 'Installment', 'Make Up'
   ];
 
-  String? _selectedCategory;
-  late TextEditingController _dateController;
-  late TextEditingController _timeController;
+  late String _selectedCategory;
+
+  /// Malaysia local time (UTC+8)
+  late DateTime _dueDateTimeMalaysia;
+
   bool _isExpired = false;
+
+  // UTC → Malaysia local
+  DateTime _toMalaysiaLocal(DateTime utcInstant) =>
+      utcInstant.toUtc().add(const Duration(hours: 8));
+
+  // Malaysia local → UTC
+  DateTime _malaysiaLocalToUtc(DateTime malaysiaLocal) =>
+      malaysiaLocal.toUtc().subtract(const Duration(hours: 8));
 
   @override
   void initState() {
     super.initState();
     _selectedCategory = widget.reminder.maintenanceType;
-    _dateController = TextEditingController(text: widget.reminder.dateExpired);
-    _timeController = TextEditingController(text: widget.reminder.timeExpired);
+    _dueDateTimeMalaysia = _toMalaysiaLocal(widget.reminder.dueDateTime);
 
-    // Check if reminder is expired
-    _checkIfExpired();
-  }
-
-  void _checkIfExpired() {
-    try {
-      final reminderDateTime = _parseFullDateTime(
-        widget.reminder.dateExpired,
-        widget.reminder.timeExpired,
-      );
-
-      if (reminderDateTime.isBefore(DateTime.now())) {
-        setState(() {
-          _isExpired = true;
-        });
-      }
-    } catch (e) {
-      print('Error checking expiration: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _dateController.dispose();
-    _timeController.dispose();
-    super.dispose();
-  }
-
-  DateTime _parseFullDateTime(String date, String time) {
-    final dateTime = DateTime.parse(date);
-
-    TimeOfDay timeOfDay;
-    if (time.contains('AM') || time.contains('PM')) {
-      final isPM = time.contains('PM');
-      final timeWithoutPeriod = time.replaceAll(RegExp(r'[AP]M'), '').trim();
-      final parts = timeWithoutPeriod.split(':');
-      int hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-
-      if (isPM && hour != 12) {
-        hour += 12;
-      } else if (!isPM && hour == 12) {
-        hour = 0;
-      }
-
-      timeOfDay = TimeOfDay(hour: hour, minute: minute);
-    } else {
-      final parts = time.split(':');
-      timeOfDay = TimeOfDay(
-        hour: int.parse(parts[0]),
-        minute: int.parse(parts[1]),
-      );
-    }
-
-    return DateTime(
-      dateTime.year,
-      dateTime.month,
-      dateTime.day,
-      timeOfDay.hour,
-      timeOfDay.minute,
-    );
+    // 判断是否过期
+    _isExpired = widget.reminder.dueDateTime.isBefore(DateTime.now().toUtc());
   }
 
   Future<void> _pickDate() async {
-    if (_isExpired) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    if (_isExpired) return;
 
-    final currentDate = DateTime.tryParse(_dateController.text) ?? DateTime.now();
+    final malaysiaNow = DateTime.now().toUtc().add(const Duration(hours: 8));
+
     final newDate = await showDatePicker(
       context: context,
-      initialDate: currentDate.isBefore(DateTime.now()) ? DateTime.now() : currentDate,
-      firstDate: DateTime.now(), // Prevent past dates
+      initialDate: _dueDateTimeMalaysia,
+      firstDate: malaysiaNow,
       lastDate: DateTime(2100),
     );
 
     if (newDate != null) {
       setState(() {
-        _dateController.text = DateFormat('yyyy-MM-dd').format(newDate);
-        // Clear time if date changed to ensure time validation
-        if (_timeController.text.isNotEmpty) {
-          _validateAndClearTimeIfNeeded();
-        }
+        _dueDateTimeMalaysia = DateTime(
+          newDate.year,
+          newDate.month,
+          newDate.day,
+          _dueDateTimeMalaysia.hour,
+          _dueDateTimeMalaysia.minute,
+        );
       });
-    }
-  }
-
-  void _validateAndClearTimeIfNeeded() {
-    // Check if the currently selected time is now in the past with the new date
-    if (_dateController.text.isNotEmpty && _timeController.text.isNotEmpty) {
-      final selectedDate = DateTime.parse(_dateController.text);
-      final timeParts = _timeController.text.split(':');
-
-      // Handle both 24-hour and 12-hour formats
-      TimeOfDay timeOfDay;
-      if (_timeController.text.contains('AM') || _timeController.text.contains('PM')) {
-        final format = DateFormat.jm();
-        final dateTime = format.parse(_timeController.text);
-        timeOfDay = TimeOfDay(hour: dateTime.hour, minute: dateTime.minute);
-      } else {
-        timeOfDay = TimeOfDay(
-          hour: int.parse(timeParts[0]),
-          minute: int.parse(timeParts[1]),
-        );
-      }
-
-      final selectedDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
-
-      if (selectedDateTime.isBefore(DateTime.now())) {
-        setState(() {
-          _timeController.text = '';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Time cleared as it would be in the past with the new date')),
-        );
-      }
     }
   }
 
   Future<void> _pickTime() async {
-    if (_isExpired) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    if (_isExpired) return;
 
-    if (_dateController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date first')),
-      );
-      return;
-    }
-
-    final now = TimeOfDay.now();
     final picked = await showTimePicker(
       context: context,
-      initialTime: now,
+      initialTime: TimeOfDay.fromDateTime(_dueDateTimeMalaysia),
     );
 
     if (picked != null) {
-      // Check if the selected date and time combination is in the past
-      final selectedDate = DateTime.parse(_dateController.text);
-      final selectedDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        picked.hour,
-        picked.minute,
-      );
-
-      if (selectedDateTime.isBefore(DateTime.now())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot select a past time')),
-        );
-        return;
-      }
-
       setState(() {
-        _timeController.text = picked.format(context);
+        _dueDateTimeMalaysia = DateTime(
+          _dueDateTimeMalaysia.year,
+          _dueDateTimeMalaysia.month,
+          _dueDateTimeMalaysia.day,
+          picked.hour,
+          picked.minute,
+        );
       });
-    }
-  }
-
-  TimeOfDay _parseTimeOfDay(String timeString) {
-    // Remove any extra spaces
-    timeString = timeString.trim();
-
-    if (timeString.contains('AM') || timeString.contains('PM')) {
-      // Handle 12-hour format (e.g., "12:44 PM")
-      final isPM = timeString.contains('PM');
-      final timeWithoutPeriod = timeString.replaceAll(RegExp(r'[AP]M'), '').trim();
-      final parts = timeWithoutPeriod.split(':');
-      int hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-
-      // Convert to 24-hour format
-      if (isPM && hour != 12) {
-        hour += 12;
-      } else if (!isPM && hour == 12) {
-        hour = 0;
-      }
-
-      return TimeOfDay(hour: hour, minute: minute);
-    } else {
-      // Handle 24-hour format
-      final parts = timeString.split(':');
-      return TimeOfDay(
-        hour: int.parse(parts[0]),
-        minute: int.parse(parts[1]),
-      );
-    }
-  }
-
-  String? _validateDateTime() {
-    if (_dateController.text.isEmpty) {
-      return 'Please select a date';
-    }
-    if (_timeController.text.isEmpty) {
-      return 'Please select a time';
-    }
-
-    try {
-      // Final validation before saving
-      final selectedDate = DateTime.parse(_dateController.text);
-      final timeOfDay = _parseTimeOfDay(_timeController.text);
-
-      final selectedDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        timeOfDay.hour,
-        timeOfDay.minute,
-      );
-
-      if (selectedDateTime.isBefore(DateTime.now())) {
-        return 'Selected date and time cannot be in the past';
-      }
-
-      return null;
-    } catch (e) {
-      return 'Invalid date or time format';
     }
   }
 
   Future<void> _saveChanges() async {
     if (_isExpired) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot edit expired reminders. Please delete and create a new one.'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('Cannot edit expired reminders.')),
       );
       return;
     }
 
-    if (_formKey.currentState!.validate()) {
-      final dateTimeError = _validateDateTime();
-      if (dateTimeError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(dateTimeError)),
-        );
-        return;
-      }
+    final dueUtc = _malaysiaLocalToUtc(_dueDateTimeMalaysia);
 
-      try {
-        await _controller.updateReminder(widget.reminder.id, {
-          'maintenanceType': _selectedCategory,
-          'dateExpired': _dateController.text,
-          'timeExpired': _timeController.text,
-        });
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reminder updated successfully.')),
-        );
-        Navigator.pop(context);
-      } catch (e) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _confirmDelete() async {
-    final deleted = await _controller.confirmAndDeleteReminder(
-      context,
-      widget.reminder.id,
+    final updated = MaintenanceReminderModel(
+      id: widget.reminder.id,
+      userId: widget.reminder.userId,
+      maintenanceType: _selectedCategory,
+      dueDateTime: dueUtc,
+      status: 'active',
+      createdAt: widget.reminder.createdAt, // 保留原 createdAt
     );
 
-    if (deleted && mounted) {
-      Navigator.pop(context); // only pop the page if deletion actually happened
+    await _controller.updateReminder(widget.reminder.id, updated);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reminder updated successfully.')),
+    );
+
+    Navigator.pop(context);
+  }
+
+  /// 🔥 Confirm Delete 内置于页面
+  Future<void> _showDeleteConfirmDialog() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Confirm Delete"),
+          content: const Text("Are you sure you want to delete this reminder?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("No"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Yes", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await _controller.deleteReminder(widget.reminder.id);
+      if (mounted) Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dateStr = DateFormat('yyyy-MM-dd').format(_dueDateTimeMalaysia);
+    final timeStr = TimeOfDay.fromDateTime(_dueDateTimeMalaysia).format(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isExpired ? 'View Expired Reminder' : 'Edit Reminder'),
         backgroundColor: _isExpired ? Colors.orange : Colors.blue,
-        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -342,8 +163,7 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
           key: _formKey,
           child: ListView(
             children: [
-              // Show warning if expired
-              if (_isExpired) ...[
+              if (_isExpired)
                 Container(
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
@@ -354,7 +174,8 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+                      Icon(Icons.warning_amber_rounded,
+                          color: Colors.orange.shade800),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -368,83 +189,77 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
                     ],
                   ),
                 ),
-              ],
 
+              // Category
               const Text("CATEGORY", style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  enabled: !_isExpired,
-                ),
-                items: _categories.map((item) =>
-                    DropdownMenuItem(value: item, child: Text(item))
-                ).toList(),
-                onChanged: _isExpired ? null : (val) => setState(() => _selectedCategory = val),
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Please select a category'
-                    : null,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+                items: _categories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: _isExpired ? null : (val) => setState(() => _selectedCategory = val!),
               ),
+
               const SizedBox(height: 20),
 
               const Text("DUE DATE & TIME", style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
 
+              // Date
               TextFormField(
-                controller: _dateController,
                 readOnly: true,
                 enabled: !_isExpired,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   suffixIcon: const Icon(Icons.calendar_today),
-                  filled: _isExpired,
-                  fillColor: _isExpired ? Colors.grey.shade200 : null,
                 ),
-                onTap: _isExpired ? null : _pickDate,
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Please select a date'
-                    : null,
+                controller: TextEditingController(text: dateStr),
+                onTap: _pickDate,
               ),
               const SizedBox(height: 12),
 
+              // Time
               TextFormField(
-                controller: _timeController,
                 readOnly: true,
                 enabled: !_isExpired,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   suffixIcon: const Icon(Icons.access_time),
-                  filled: _isExpired,
-                  fillColor: _isExpired ? Colors.grey.shade200 : null,
                 ),
-                onTap: _isExpired ? null : _pickTime,
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Please select a time'
-                    : null,
+                controller: TextEditingController(text: timeStr),
+                onTap: _pickTime,
               ),
+
               const SizedBox(height: 30),
 
+              // Save Button
               if (!_isExpired)
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: _saveChanges,
                   child: const Text("Done", style: TextStyle(fontSize: 16)),
                 ),
 
-              if (!_isExpired) const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
+              // Delete Button
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
                 ),
-                onPressed: _confirmDelete,
+                onPressed: () async {
+                  final deleted = await _controller.confirmAndDeleteReminder(context, widget.reminder.id);
+                  if (deleted && mounted) Navigator.pop(context);
+                },
+
                 child: const Text("Delete", style: TextStyle(fontSize: 16)),
               ),
             ],

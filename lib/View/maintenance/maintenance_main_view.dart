@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'set_reminder_view.dart';
 import 'edit_active_reminder_page.dart';
-
+import 'reminder_history_view.dart';
 class MaintenanceMainView extends StatelessWidget {
   const MaintenanceMainView({super.key});
 
@@ -18,7 +18,7 @@ class MaintenanceMainView extends StatelessWidget {
             const SizedBox(height: 100),
             _buildButton(context, 'Edit Active Reminder', const EditActiveReminderPage()),
             const SizedBox(height: 100),
-            _buildButton(context, 'View Reminder History', const SetReminderView()),
+            _buildButton(context, 'View Reminder History', const ReminderHistoryView()),
           ],
         ),
       ),

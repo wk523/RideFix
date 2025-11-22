@@ -1,37 +1,30 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:ridefix/View/auth/register_screen.dart';
 import 'package:ridefix/services/notification_service.dart';
 
-// Import RideFX onboarding and login pages
+// Import your app screens
 import 'View/auth/welcome_screen.dart';
-import 'package:ridefix/view/auth/login_screen.dart';
-import 'package:ridefix/view/profile/profile_screen.dart';
-
-// Import vehicle maintenance modules
-import 'package:ridefix/VehicleMaintenance/UpdateVehicle.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleDetails.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleList.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
-
-//Import troubleshooting
-import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
-import 'package:ridefix/view/troubleshoot/qna_list_view.dart';
-
-//Import Maintenance Reminder
-import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+import 'View/auth/login_screen.dart';
+import 'View/auth/register_screen.dart';
+import 'View/profile/profile_screen.dart';
+import 'VehicleMaintenance/VehicleList.dart';
+import 'VehicleMaintenance/VehicleRegistration.dart';
+import 'VehicleMaintenance/UpdateVehicle.dart';
+import 'View/troubleshoot/troubleshooting_page.dart';
+import 'view/troubleshoot/qna_list_view.dart';
+import 'View/maintenance/maintenance_main_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().initialize();
+
   try {
-    // Initialize Firebase
+    // 1️⃣ Initialize Firebase first
     await Firebase.initializeApp();
     print('✅ Firebase initialized successfully');
 
-    // Initialize Notification Service
+    // 2️⃣ Initialize NotificationService AFTER Firebase
     await NotificationService().initialize();
-    print('✅ Notification service initialized successfully');
+    print('✅ NotificationService initialized successfully');
   } catch (e) {
     print('❌ Error during initialization: $e');
   }
@@ -59,13 +52,12 @@ class MyApp extends StatelessWidget {
       home: const WelcomeScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/vehicleList': (context) => VehicleListPage(),
         '/vehicleRegister': (context) => VehicleRegistrationPage(),
-        //'/vehicleDetails': (context) => VehicleDetailsPage(),
         '/updateVehicle': (context) => UpdateVehiclePage(),
         '/profile': (context) => const ProfileScreen(),
         '/guide': (context) => const TroubleshootingPage(),
-        '/register': (context) => const RegisterScreen(),
         '/qnaList': (context) => QnaListView(),
         '/maintenance': (context) => MaintenanceMainView(),
       },
