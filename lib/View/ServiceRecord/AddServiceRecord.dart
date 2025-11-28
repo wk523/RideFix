@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/ServiceRecord/ServiceRecordDatabase.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/Controller/ServiceRecord/ServiceRecordController.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 enum ServiceCategory {
   none,
@@ -281,7 +283,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
       case ServiceCategory.maintenance:
         return MaintenanceForm(
           onChanged: (data) => _extraFormData = data,
-          initialMileage: _selectedVehicle?.mileage?.toString(),
+          initialMileage: _selectedVehicle?.mileage.toString(),
         );
 
       case ServiceCategory.roadTax:
@@ -322,7 +324,7 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
                     children: [
                       /// Vehicle dropdown
                       DropdownButtonFormField<Vehicle>(
-                        value: _selectedVehicle,
+                        initialValue: _selectedVehicle,
                         decoration: const InputDecoration(
                           labelText: 'Select Vehicle',
                           border: OutlineInputBorder(),

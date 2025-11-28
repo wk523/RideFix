@@ -2,9 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:typed_data';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 class VehicleRegistrationPage extends StatefulWidget {
   final DocumentSnapshot userDoc;

@@ -1,13 +1,17 @@
+// AddFuelEntryPage.dart (Complete corrected file)
+
 // import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/Controller/Fuel&MileageAnalytics/FuelAnalyticsController.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 class AddFuelEntryPage extends StatefulWidget {
   final DocumentSnapshot userDoc;
@@ -16,17 +20,6 @@ class AddFuelEntryPage extends StatefulWidget {
 
   @override
   State<AddFuelEntryPage> createState() => _AddFuelEntryPageState();
-}
-
-class FuelDataService {
-  final storageRef = FirebaseStorage.instance.ref();
-
-  Future<String> uploadFuelImage(Uint8List bytes) async {
-    final path = "fuel_images/${DateTime.now().millisecondsSinceEpoch}.jpg";
-    final ref = storageRef.child(path);
-    await ref.putData(bytes);
-    return await ref.getDownloadURL();
-  }
 }
 
 class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
@@ -40,7 +33,9 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
   Vehicle? _selectedVehicle;
   List<Vehicle> _vehicleList = [];
 
+  // VehicleDataService instance is used for vehicle list and now for mileage update
   final VehicleDataService _vehicleService = VehicleDataService();
+  final FuelEntryDatabase _fuelService = FuelEntryDatabase();
 
   String _selectedFuelType = "RON95";
   bool _isFullTank = false;
@@ -51,6 +46,9 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
 
   final _fuelTypes = ["RON95", "RON97", "DIESEL", "EV CHARGE", "OTHER"];
 
+  // DEFINE THRESHOLD: 15% drop from average efficiency
+  static const double _FE_DROP_THRESHOLD = 0.15;
+
   @override
   void initState() {
     super.initState();
@@ -58,12 +56,34 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
     _dateController.text = DateFormat("yyyy-MM-dd").format(DateTime.now());
   }
 
+  /// ❌ ERROR FIX: dispose MUST NOT be nested inside initState.
+  @override
+  void dispose() {
+    _mileageController.dispose();
+    _amountController.dispose();
+    _volumeController.dispose();
+    _priceController.dispose();
+    _stationController.dispose();
+    _dateController.dispose();
+    super.dispose();
+  }
+
   /// ------------------------------------------------------------
-  /// READ VEHICLE LIST (your required version)
+  /// READ VEHICLE LIST (Fixed: Explicitly type 'list')
   /// ------------------------------------------------------------
   Future<void> _loadVehicles() async {
-    final list = await _vehicleService.readVehicleData();
-    setState(() => _vehicleList = list);
+    // FIX: Explicitly specify the type to prevent type inference errors
+    final List<Vehicle> list = await _vehicleService.readVehicleData();
+
+    // Using a block with setState for multiline operations
+    setState(() {
+      _vehicleList = list;
+    });
+
+    if (_selectedVehicle == null && _vehicleList.isNotEmpty) {
+      _selectedVehicle = _vehicleList.first;
+      _mileageController.text = _selectedVehicle!.mileage.toString();
+    }
   }
 
   /// ------------------------------------------------------------
@@ -88,19 +108,21 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
   }
 
   /// ------------------------------------------------------------
-  /// SAFE MILEAGE PARSER
+  /// SAFE MILEAGE PARSER (Returns int)
   /// ------------------------------------------------------------
-  double _safeMileageParse(String? value) {
+  int _safeMileageParse(String? value) {
     if (value == null) return 0;
     final cleaned = value.replaceAll(RegExp(r'[^0-9]'), '');
-    return double.tryParse(cleaned) ?? 0;
+    return int.tryParse(cleaned) ?? 0;
   }
 
   /// ------------------------------------------------------------
-  /// Success Dialog
+  /// Success Dialog (Updated with drop check)
   /// ------------------------------------------------------------
-
-  Future<void> _showSuccessDialog(double fuelEfficiency) async {
+  Future<void> _showSuccessDialog(
+    double fuelEfficiency,
+    bool isSeriousDrop,
+  ) async {
     return showDialog(
       context: context,
       barrierDismissible: false,
@@ -109,19 +131,53 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text("Fuel Entry Saved"),
+          title: Text(
+            isSeriousDrop ? "Warning: Maintenance Check" : "Fuel Entry Saved",
+            textAlign: TextAlign.center,
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment
+                .center, // Ensures content is centered horizontally
             children: [
-              const Icon(Icons.check_circle, size: 50, color: Colors.green),
+              // UPDATE ICON AND MESSAGE FOR DROP
+              Icon(
+                isSeriousDrop
+                    ? Icons.warning_amber_rounded
+                    : Icons.check_circle,
+                size: 50,
+                color: isSeriousDrop ? Colors.orange : Colors.green,
+              ),
+              const SizedBox(height: 12),
+              if (isSeriousDrop) ...[
+                const Text(
+                  "Serious Fuel Efficiency Drop!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Your fuel efficiency dropped by over 15%. This could indicate a maintenance issue. Please check your car.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Text(
+                "Fuel Efficiency:",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
               const SizedBox(height: 12),
               Text(
-                "Fuel Efficiency:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "${fuelEfficiency.toStringAsFixed(2)} km/L",
-                style: TextStyle(fontSize: 20, color: Colors.blue),
+                fuelEfficiency > 0
+                    ? "${fuelEfficiency.toStringAsFixed(2)} km/L"
+                    : "N/A (Not a full tank entry or no previous full tank data)",
+                style: const TextStyle(fontSize: 20, color: Colors.blue),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -131,25 +187,11 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
               child: const Text("OK"),
             ),
           ],
+          actionsAlignment: MainAxisAlignment
+              .center, // Explicitly centers the actions (the "OK" button)
         );
       },
     );
-  }
-
-  /// ------------------------------------------------------------
-  /// Get Last Fuel Mileage
-  /// ------------------------------------------------------------
-  Future<double> _getLastFuelMileage() async {
-    final query = await FirebaseFirestore.instance
-        .collection('fuel_records')
-        .where('vehicleId', isEqualTo: _selectedVehicle!.vehicleId)
-        .orderBy('mileage', descending: true)
-        .limit(1)
-        .get();
-
-    if (query.docs.isEmpty) return 0;
-
-    return (query.docs.first.data()['mileage'] ?? 0).toDouble();
   }
 
   /// ------------------------------------------------------------
@@ -168,7 +210,7 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
   }
 
   /// ------------------------------------------------------------
-  /// SAVE RECORD
+  /// SAVE RECORD (Updated with drop check)
   /// ------------------------------------------------------------
   Future<void> _saveRecord() async {
     if (_selectedVehicle == null) {
@@ -178,7 +220,7 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
       return;
     }
 
-    // --- PREVENT FUTURE DATE ---
+    // --- VALIDATION ---
     final inputDate = DateFormat("yyyy-MM-dd").parse(_dateController.text);
     if (inputDate.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,10 +232,12 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
     final mileageEntered = _safeMileageParse(_mileageController.text);
     final currentMileage = (_selectedVehicle!.mileage);
 
-    if (mileageEntered < currentMileage) {
+    if (mileageEntered <= currentMileage) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("⚠️ Mileage cannot be lower than current mileage."),
+        SnackBar(
+          content: Text(
+            "⚠️ Mileage cannot be same/lower than current mileage (${currentMileage} km).",
+          ),
         ),
       );
       return;
@@ -209,54 +253,126 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
       return;
     }
 
+    final pricePerLiter = amount / volume;
     setState(() => _isSaving = true);
 
     // --- IMAGE UPLOAD ---
     String? imgUrl;
     if (_selectedImageBytes != null) {
-      imgUrl = await FuelDataService().uploadFuelImage(_selectedImageBytes!);
+      imgUrl = await _fuelService.uploadFuelImage(_selectedImageBytes!);
     }
 
-    // --- GET PREVIOUS MILAGE FOR FUEL EFFICIENCY ---
-    final lastMileage = await _getLastFuelMileage();
+    // --- FUEL EFFICIENCY CALCULATION (Tank-to-Tank Logic) ---
     double fuelEfficiency = 0;
+    int lastFullTankMileage = 0;
+    double totalIntermediateVolume = 0;
 
-    if (lastMileage > 0 && mileageEntered > lastMileage) {
-      final distance = mileageEntered - lastMileage;
-      fuelEfficiency = distance / volume;
+    if (_isFullTank) {
+      final result = await _fuelService.getSummarySinceLastFullTank(
+        _selectedVehicle!.vehicleId,
+      );
+
+      // Assuming the result structure:
+      lastFullTankMileage = result['lastFullTankMileage'] ?? 0;
+      totalIntermediateVolume = result['totalVolumeSinceLastFullTank'] ?? 0.0;
+
+      // Total volume for the current cycle (Last Full Tank -> Current Full Tank)
+      // is the total intermediate volume PLUS the volume of the CURRENT fill.
+      final double totalVolumeUsed = totalIntermediateVolume + volume;
+
+      debugPrint('DEBUG FE: Current Full Tank: $_isFullTank');
+      debugPrint('DEBUG FE: Last Full Tank Mileage: $lastFullTankMileage km');
+      debugPrint(
+        'DEBUG FE: Total Volume Since Last Full Tank: ${totalIntermediateVolume.toStringAsFixed(2)} L',
+      );
+      debugPrint(
+        'DEBUG FE: Current Fill Volume: ${volume.toStringAsFixed(2)} L',
+      );
+      debugPrint(
+        'DEBUG FE: Total Volume Used for Cycle: ${totalVolumeUsed.toStringAsFixed(2)} L',
+      );
+
+      if (lastFullTankMileage > 0 &&
+          mileageEntered > lastFullTankMileage &&
+          totalVolumeUsed > 0) {
+        final double distance = (mileageEntered - lastFullTankMileage)
+            .toDouble();
+        // Formula: Distance / Total Volume (including current fill)
+        fuelEfficiency = distance / totalVolumeUsed;
+        debugPrint(
+          'DEBUG FE: Calculated Efficiency: ${fuelEfficiency.toStringAsFixed(2)} km/L',
+        );
+      }
+    } else {
+      // Not a full tank. Efficiency is not calculated (it remains 0)
+      debugPrint('DEBUG FE: Not a full tank entry, efficiency skipped.');
     }
 
-    // --- SAVE INTO FIRESTORE ---
-    final data = {
-      "uid": FirebaseAuth.instance.currentUser!.uid,
-      "vehicleId": _selectedVehicle!.vehicleId,
-      "mileage": mileageEntered,
-      "amount": amount,
-      "volume": volume,
-      "pricePerLiter": amount / volume,
-      "fuelType": _selectedFuelType,
-      "isFullTank": _isFullTank,
-      "station": _stationController.text,
-      "date": _dateController.text,
-      "imageUrl": imgUrl ?? "",
-      "fuelEfficiency": fuelEfficiency, // 🔥 NEW
-      "createdAt": DateTime.now(),
-    };
+    // CHECK FOR SERIOUS DROP
+    bool isSeriousDrop = false;
+    if (_isFullTank && fuelEfficiency > 0) {
+      // The method FuelEntryDatabase.getAverageFuelEfficiency was implemented in the previous step
+      final double avgFe = await _fuelService.getAverageFuelEfficiency(
+        _selectedVehicle!.vehicleId,
+      );
 
-    await FirebaseFirestore.instance.collection("fuel_records").add(data);
+      debugPrint(
+        'DEBUG FE: Average Efficiency: ${avgFe.toStringAsFixed(2)} km/L',
+      );
 
-    // --- UPDATE VEHICLE MILEAGE ---
+      if (avgFe > 0) {
+        final double dropPercentage = (avgFe - fuelEfficiency) / avgFe;
+        debugPrint(
+          'DEBUG FE: Drop Percentage: ${(dropPercentage * 100).toStringAsFixed(2)}%',
+        );
+
+        // IMPLEMENT DROP CHECK LOGIC
+        if (dropPercentage >= _FE_DROP_THRESHOLD) {
+          isSeriousDrop = true;
+        }
+      }
+    }
+
+    // --- SAVE FUEL ENTRY ---
+    await _fuelService.addFuelEntry(
+      uid: FirebaseAuth.instance.currentUser!.uid,
+      vehicleId: _selectedVehicle!.vehicleId,
+      amount: amount,
+      volumeL: volume,
+      pricePerLiter: pricePerLiter,
+      fuelType: _selectedFuelType,
+      station: _stationController.text,
+      mileage: mileageEntered,
+      date: _dateController.text,
+      isFullTank: _isFullTank,
+      imgURL: imgUrl,
+      fuelEfficiency: fuelEfficiency, // Store the calculated result (or 0)
+    );
+
+    // --- UPDATE VEHICLE MILEAGE (Using existing VehicleDataService) ---
     if (mileageEntered > currentMileage) {
-      await FirebaseFirestore.instance
-          .collection("vehicles")
-          .doc(_selectedVehicle!.vehicleId)
-          .update({"mileage": mileageEntered.toString()});
+      await _vehicleService.updateVehicleMileage(
+        _selectedVehicle!.vehicleId,
+        mileageEntered,
+      );
+
+      // Update the local vehicle object for immediate UI reflection
+      setState(() {
+        _selectedVehicle = _selectedVehicle!.copyWith(mileage: mileageEntered);
+        final index = _vehicleList.indexWhere(
+          (v) => v.vehicleId == _selectedVehicle!.vehicleId,
+        );
+        if (index != -1) {
+          _vehicleList[index] = _selectedVehicle!;
+        }
+      });
     }
 
     setState(() => _isSaving = false);
 
     // --- SHOW POPUP ---
-    await _showSuccessDialog(fuelEfficiency);
+    // Pass the flag to the success dialog
+    await _showSuccessDialog(fuelEfficiency, isSeriousDrop);
 
     if (mounted) Navigator.pop(context, true);
   }
@@ -266,6 +382,7 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
   /// ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    // ... (UI code) ...
     return Stack(
       children: [
         Scaffold(
@@ -293,7 +410,8 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
                     children: [
                       /// VEHICLE DROPDOWN
                       DropdownButtonFormField<Vehicle>(
-                        value: _selectedVehicle,
+                        value:
+                            _selectedVehicle, // Use value instead of initialValue
                         decoration: const InputDecoration(
                           labelText: 'Select Vehicle',
                           border: OutlineInputBorder(),
@@ -325,7 +443,8 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
                         controller: _mileageController,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
+                          FilteringTextInputFormatter
+                              .digitsOnly, // <-- Only digits allowed
                         ],
 
                         decoration: InputDecoration(
@@ -341,7 +460,8 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
 
                         onTap: () {
                           // Only clear text if it is the same as the vehicle's current mileage
-                          final current = _selectedVehicle?.mileage ?? '';
+                          final current =
+                              _selectedVehicle?.mileage.toString() ?? '';
                           if (_mileageController.text == current) {
                             _mileageController.clear();
                           }
@@ -355,7 +475,10 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
                         controller: _amountController,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
+                          // Allows digits and a single decimal point
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d+\.?\d*'),
+                          ),
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Amount (RM)',
@@ -373,7 +496,10 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
                               controller: _volumeController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
+                                // Allows digits and a single decimal point
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d+\.?\d*'),
+                                ),
                               ],
                               decoration: const InputDecoration(
                                 labelText: 'Volume (L)',
@@ -507,7 +633,10 @@ class _AddFuelEntryPageState extends State<AddFuelEntryPage> {
                       ),
                       backgroundColor: Colors.blue,
                     ),
-                    child: const Text('Done', style: TextStyle(fontSize: 18)),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
                   ),
                 ),
               ),

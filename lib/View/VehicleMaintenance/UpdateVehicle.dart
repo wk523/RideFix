@@ -1,8 +1,10 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:intl/intl.dart'; // <--- Import for date formatting
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 class UpdateVehiclePage extends StatefulWidget {
   final Vehicle vehicleDetails;
@@ -30,6 +32,9 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
   String? oldImageUrl;
   bool _isLoading = false;
 
+  // Store the initial mileage to enforce validation
+  late int initialMileage;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +48,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     roadTaxController = TextEditingController(text: v.roadTaxExpired);
     previewUrl = v.imageUrl;
     oldImageUrl = v.imageUrl;
+
+    initialMileage = v.mileage; // Store initial mileage
   }
 
   @override
@@ -58,6 +65,7 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
   }
 
   Future<void> _pickNewImage() async {
+    // ... (image picking logic remains the same)
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? pickedFile = await picker.pickImage(
@@ -77,6 +85,21 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     }
   }
 
+  // New function to handle date selection for Road Tax
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: roadTaxController.text.isNotEmpty
+          ? DateFormat('dd/MM/yyyy').parse(roadTaxController.text)
+          : DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      roadTaxController.text = DateFormat('dd/MM/yyyy').format(picked);
+    }
+  }
+
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -89,12 +112,15 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     try {
       final updatedVehicle = Vehicle(
         vehicleId: widget.vehicleDetails.vehicleId,
-        brand: brandController.text.trim().toUpperCase(),
-        color: colorController.text.trim().toUpperCase(),
-        model: modelController.text.trim().toUpperCase(),
-        plateNumber: plateController.text.trim().toUpperCase(),
-        manYear: safeParseInt(yearController.text),
+        // CRUCIAL: Use original data for non-editable fields to ensure consistency
+        brand: widget.vehicleDetails.brand,
+        model: widget.vehicleDetails.model,
+        plateNumber: widget.vehicleDetails.plateNumber,
+        manYear: widget.vehicleDetails.manYear,
         uid: widget.vehicleDetails.uid,
+
+        // Editable fields use controller text
+        color: colorController.text.trim().toUpperCase(),
         roadTaxExpired: roadTaxController.text.trim(),
         mileage: safeParseInt(mileageController.text),
         imageUrl: oldImageUrl ?? '',
@@ -178,6 +204,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
                     child: _buildUppercaseField(
                       controller: brandController,
                       hintText: 'Brand',
+                      label: 'Brand', // Added Label
+                      readOnly: true, // Restricted Field
                       validator: (v) => v!.isEmpty ? 'Brand required' : null,
                     ),
                   ),
@@ -186,6 +214,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
                     child: _buildUppercaseField(
                       controller: modelController,
                       hintText: 'Model',
+                      label: 'Model', // Added Label
+                      readOnly: true, // Restricted Field
                       validator: (v) => v!.isEmpty ? 'Model required' : null,
                     ),
                   ),
@@ -195,6 +225,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
               _buildUppercaseField(
                 controller: plateController,
                 hintText: 'Vehicle Plate Number',
+                label: 'Vehicle Plate Number', // Added Label
+                readOnly: true, // Restricted Field
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Plate required';
                   if (!RegExp(
@@ -209,9 +241,7 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
               _buildUppercaseField(
                 controller: colorController,
                 hintText: 'Color',
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
-                ],
+                label: 'Color', // Added Label
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Color required';
                   if (!RegExp(r'^[A-Za-z]+$').hasMatch(v)) {
@@ -224,6 +254,8 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
               _buildNumericField(
                 controller: yearController,
                 hintText: 'Manufacture Year',
+                label: 'Manufacture Year', // Added Label
+                readOnly: true, // Restricted Field
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Year required';
                   final y = int.tryParse(v);
@@ -237,12 +269,24 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
               _buildNumericField(
                 controller: mileageController,
                 hintText: 'Mileage',
-                validator: (v) => v!.isEmpty ? 'Mileage required' : null,
+                label: 'Current Mileage (KM)', // Added Label
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Mileage required';
+                  final newMileage = int.tryParse(v);
+                  // 🔑 Validation for mileage lower than current
+                  if (newMileage != null && newMileage < initialMileage) {
+                    return 'Mileage cannot be less than $initialMileage';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 10),
               _buildInputField(
                 controller: roadTaxController,
-                hintText: 'Road Tax Expired Date',
+                hintText: 'DD/MM/YYYY',
+                label: 'Road Tax Expired Date', // Added Label
+                readOnly: true, // Make read-only for date picker
+                onTap: () => _selectDate(context), // Use date picker
                 validator: (v) => v!.isEmpty ? 'Road tax date required' : null,
               ),
               const SizedBox(height: 30),
@@ -281,6 +325,7 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
   // ---------------- Helper Widgets ----------------
 
   Widget _buildImagePreview() {
+    // ... (image preview logic remains the same)
     if (newImageBytes != null) {
       return Image.memory(
         newImageBytes!,
@@ -329,63 +374,123 @@ class _UpdateVehiclePageState extends State<UpdateVehiclePage> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(String hint, bool isReadOnly) {
     return InputDecoration(
       hintText: hint,
       filled: true,
-      fillColor: Colors.white,
+      fillColor: isReadOnly
+          ? Colors.grey[100]
+          : Colors.white, // Visual cue for read-only
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(5),
         borderSide: BorderSide(color: Colors.grey.shade300),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(5),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(5),
+        borderSide: BorderSide(
+          color: isReadOnly ? Colors.grey.shade300! : Colors.blue,
+        ),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    );
+  }
+
+  // ---------------- MODIFIED HELPER WIDGETS ----------------
+
+  Widget _buildLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0, top: 4.0),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.grey[700],
+          fontSize: 13,
+        ),
+      ),
     );
   }
 
   Widget _buildInputField({
     required TextEditingController controller,
     required String hintText,
+    required String label, // New required parameter
     String? Function(String?)? validator,
+    bool readOnly = false, // New parameter for restriction
+    VoidCallback? onTap, // New parameter for date picker
   }) {
-    return TextFormField(
-      controller: controller,
-      decoration: _inputDecoration(hintText),
-      validator: validator,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label), // Display the label
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          onTap: onTap,
+          decoration: _inputDecoration(hintText, readOnly),
+          validator: validator,
+        ),
+      ],
     );
   }
 
   Widget _buildUppercaseField({
     required TextEditingController controller,
     required String hintText,
+    required String label, // New required parameter
     String? Function(String?)? validator,
     List<TextInputFormatter>? inputFormatters,
+    bool readOnly = false, // New parameter for restriction
   }) {
-    return TextFormField(
-      controller: controller,
-      textCapitalization: TextCapitalization.characters,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      onChanged: (val) {
-        controller.value = controller.value.copyWith(
-          text: val.toUpperCase(),
-          selection: TextSelection.collapsed(offset: val.length),
-        );
-      },
-      decoration: _inputDecoration(hintText),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label), // Display the label
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: inputFormatters,
+          validator: validator,
+          onChanged: readOnly
+              ? null
+              : (val) {
+                  // Disable onChanged for readOnly
+                  controller.value = controller.value.copyWith(
+                    text: val.toUpperCase(),
+                    selection: TextSelection.collapsed(offset: val.length),
+                  );
+                },
+          decoration: _inputDecoration(hintText, readOnly),
+        ),
+      ],
     );
   }
 
   Widget _buildNumericField({
     required TextEditingController controller,
     required String hintText,
+    required String label, // New required parameter
     String? Function(String?)? validator,
+    bool readOnly = false, // New parameter for restriction
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      validator: validator,
-      decoration: _inputDecoration(hintText),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label), // Display the label
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          validator: validator,
+          decoration: _inputDecoration(hintText, readOnly),
+        ),
+      ],
     );
   }
 }

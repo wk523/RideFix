@@ -396,7 +396,7 @@ class _EditReminderFormPageState extends State<EditReminderFormPage> {
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   enabled: !_isExpired,

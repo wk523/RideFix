@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ridefix/View/VehicleMaintenance/UpdateVehicle.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 class VehicleDetailsPage extends StatefulWidget {
   final String vehicleId;
@@ -18,13 +20,54 @@ class VehicleDetailsPage extends StatefulWidget {
 }
 
 class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
-  // 🔁 Used to trigger rebuild when coming back from update page
   bool _forceRefresh = false;
+
+  // 🚀 OPTIMIZATION STEP 1: Declare a variable to hold the Future result.
+  late Future<Map<String, dynamic>> _analyticsFuture;
+
+  // 🚀 OPTIMIZATION STEP 2: Initialize the Future only once in initState.
+  @override
+  void initState() {
+    super.initState();
+    _analyticsFuture = _fetchAnalyticsData();
+  }
+
+  // Method to fetch ALL analytics data concurrently (same logic, better usage)
+  Future<Map<String, dynamic>> _fetchAnalyticsData() async {
+    final serviceCountFuture = vehicleDataService.getServiceCount(
+      widget.vehicleId,
+      widget.uid,
+    );
+    final fuelCountFuture = vehicleDataService.getFuelEntryCount(
+      widget.vehicleId,
+      widget.uid,
+    );
+    final expenseSummaryFuture = vehicleDataService.getExpenseSummary(
+      widget.vehicleId,
+      widget.uid,
+    );
+
+    final results = await Future.wait([
+      serviceCountFuture,
+      fuelCountFuture,
+      expenseSummaryFuture,
+    ]);
+
+    final expenseSummary = results[2] as Map<String, double>;
+
+    return {
+      'serviceHistoryCount': results[0],
+      'fuelEntriesCount': results[1],
+      'totalExpenses': expenseSummary['totalExpenses'],
+      'avgMonthlyExpenses': expenseSummary['avgMonthlyExpenses'],
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      key: ValueKey(_forceRefresh), // ensures rebuild when toggled
+      // The key triggers a full State rebuild, which re-runs initState and the analytics fetch
+      key: ValueKey(_forceRefresh),
       stream: FirebaseFirestore.instance
           .collection('Vehicle')
           .doc(widget.vehicleId)
@@ -47,12 +90,6 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
   }
 
   Widget _buildVehicleDetailUI(BuildContext context, Vehicle vehicle) {
-    // ✅ Hardcoded values (you can later connect to Firestore or analytics)
-    const serviceHistoryCount = 10;
-    const fuelEntriesCount = 20;
-    const totalExpenses = 3010.00;
-    const avgMonthlyExpenses = 1505.00;
-
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
@@ -81,9 +118,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
               aspectRatio: 16 / 9,
               child: Image.network(
                 vehicle.imageUrl,
-                fit: BoxFit.contain,
-                width: double.infinity,
-                height: 220,
+                fit: BoxFit.cover,
                 alignment: Alignment.center,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
@@ -120,9 +155,12 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                     ),
                   );
 
-                  // ✅ After update, rebuild StreamBuilder manually
                   if (result == true) {
-                    setState(() => _forceRefresh = !_forceRefresh);
+                    // 🚀 OPTIMIZATION STEP 3: Re-initialize the Future AND then trigger the rebuild
+                    setState(() {
+                      _analyticsFuture = _fetchAnalyticsData();
+                      _forceRefresh = !_forceRefresh;
+                    });
                   }
                 },
               ),
@@ -191,11 +229,70 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                   label: 'Road Tax Expiry',
                   value: vehicle.roadTaxExpired,
                 ),
-                SizedBox(height: 10),
-                DetailRow(label: 'Service History Count', value: '10'),
-                DetailRow(label: 'Fuel Entries Count', value: '20'),
-                DetailRow(label: 'Total Expenses (RM)', value: '3010.00'),
-                DetailRow(label: 'Avg Monthly Expenses (RM)', value: '1505.00'),
+                const SizedBox(height: 10),
+                const Divider(),
+                const SizedBox(height: 10),
+
+                // --- Analytics Data (Dynamic) ---
+                FutureBuilder<Map<String, dynamic>>(
+                  // 🚀 OPTIMIZATION STEP 4: Use the initialized variable here.
+                  // It will only call _fetchAnalyticsData() once unless the key forces a rebuild.
+                  future: _analyticsFuture,
+                  builder: (context, analyticsSnapshot) {
+                    if (analyticsSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      );
+                    }
+
+                    final data = analyticsSnapshot.data ?? {};
+                    final serviceCount =
+                        data['serviceHistoryCount'] as int? ?? 0;
+                    final fuelCount = data['fuelEntriesCount'] as int? ?? 0;
+                    final totalExpenses =
+                        data['totalExpenses'] as double? ?? 0.0;
+                    final avgMonthlyExpenses =
+                        data['avgMonthlyExpenses'] as double? ?? 0.0;
+
+                    if (analyticsSnapshot.hasError) {
+                      return const DetailRow(
+                        label: 'Analytics Error',
+                        value: 'Data failed to load',
+                        valueColor: Colors.red,
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        DetailRow(
+                          label: 'Service History Count',
+                          value: serviceCount.toString(),
+                          valueColor: serviceCount > 0
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
+                        DetailRow(
+                          label: 'Fuel Entries Count',
+                          value: fuelCount.toString(),
+                          valueColor: fuelCount > 0
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
+                        DetailRow(
+                          label: 'Total Expenses (RM)',
+                          value: totalExpenses.toStringAsFixed(2),
+                          valueColor: Colors.red,
+                        ),
+                        DetailRow(
+                          label: 'Avg Monthly Expenses (RM)',
+                          value: avgMonthlyExpenses.toStringAsFixed(2),
+                          valueColor: Colors.red,
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -204,17 +301,22 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
     );
   }
 }
-
 // --- Helper Widget ---
+
 class DetailRow extends StatelessWidget {
   final String label;
+
   final String value;
+
   final Color valueColor;
 
   const DetailRow({
     required this.label,
+
     required this.value,
+
     this.valueColor = Colors.black,
+
     super.key,
   });
 
@@ -222,20 +324,28 @@ class DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
+
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
         children: [
           Text(
             '$label:',
+
             style: const TextStyle(fontSize: 16, color: Colors.black87),
           ),
+
           Flexible(
             child: Text(
               value,
+
               textAlign: TextAlign.end,
+
               style: TextStyle(
                 fontSize: 16,
+
                 fontWeight: FontWeight.bold,
+
                 color: valueColor,
               ),
             ),

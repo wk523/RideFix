@@ -2,8 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsDatabase.dart';
+import 'package:ridefix/Controller/ExpensesAnalytics/ExpensesAnalyticsConrtoller.dart';
 import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+
+import '../Fuel&MileageAnalytics/FuelEntry.dart';
+import '../ServiceRecord/ServiceRecord.dart';
 
 class ExpensesAnalyticsPage extends StatefulWidget {
   final DocumentSnapshot userDoc;
@@ -16,6 +20,7 @@ class ExpensesAnalyticsPage extends StatefulWidget {
 
 class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   final _db = ExpensesAnalyticsDatabase();
+  final VehicleDataService _vehicleService = VehicleDataService();
   String _selectedDuration = 'MONTHS';
   String _currentPeriod = DateFormat('yyyy').format(DateTime.now());
   DateTime _currentDate = DateTime.now();
@@ -35,6 +40,10 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
   Map<String, double> _categoryData = {};
   List<MapEntry<String, double>> monthlyEntries = [];
   List<Map<String, dynamic>> topCategories = [];
+
+  List<String> selectedCategories = [];
+  String? selectedVehicleId; // 'All' or specific vehicleId
+  Map<String, String> vehicleNames = {};
 
   late final String uid;
 
@@ -78,22 +87,229 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
     );
   }
 
+  InputDecoration _dropdownDecoration() {
+    return InputDecoration(
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  Widget _sectionHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.blue),
+        const SizedBox(width: 5),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  // --- FILTER DIALOG FUNCTION (Adapted from ServiceRecordPage) ---
+
+  Future<void> _showFilterDialog() async {
+    // Temporary variables for modal state
+    List<String> tempCategories = List.from(selectedCategories);
+    String? tempVehicleId = selectedVehicleId; // Null means "All" initially
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Center(
+                    child: Text(
+                      "Filter Expenses", // Updated Title
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // CATEGORY SECTION
+                  _sectionHeader(Icons.category, "Category"),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (var cat in [
+                        'Maintenance',
+                        'Toll',
+                        'Parking',
+                        'Car Wash',
+                        'Insurance',
+                        'Road Tax',
+                        'Installment',
+                        'Fuel', // Added Fuel from the Expenses DB logic
+                      ])
+                        FilterChip(
+                          label: Text(cat),
+                          selected: tempCategories.contains(cat),
+                          selectedColor: Colors.blue,
+                          onSelected: (v) {
+                            setModalState(() {
+                              if (v) {
+                                tempCategories.add(cat);
+                              } else {
+                                tempCategories.remove(cat);
+                              }
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // VEHICLE DROPDOWN (Assumes you have a stream or way to get vehicle data)
+                  _sectionHeader(Icons.directions_car, "Vehicle"),
+                  StreamBuilder(
+                    stream: _vehicleService
+                        .vehiclesStream, // Use the instance variable
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final vehicles = snapshot.data!;
+
+                      // 🔑 CRITICAL: Mutate the state variable `vehicleNames` here
+                      // This updates the map for use in the main page filter chips
+                      vehicleNames.clear();
+                      for (var v in vehicles) {
+                        vehicleNames[v.vehicleId] =
+                            "${v.brand} ${v.model} (${v.plateNumber})";
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        initialValue: tempVehicleId ?? "All",
+                        decoration: _dropdownDecoration(),
+                        items: [
+                          const DropdownMenuItem(
+                            value: "All",
+                            child: Text("All Vehicles"),
+                          ),
+                          ...vehicles.map(
+                            (v) => DropdownMenuItem(
+                              value: v.vehicleId,
+                              child: Text(
+                                vehicleNames[v.vehicleId]!,
+                              ), // Use the state map
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setModalState(() => tempVehicleId = v),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // APPLY BUTTONS
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.refresh, color: Colors.red),
+                        label: const Text(
+                          "Reset",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: () {
+                          // Reset temporary state to default
+                          setModalState(() {
+                            tempCategories.clear();
+                            tempVehicleId = null; // Resets to 'All' implicitly
+                          });
+                        },
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text("Apply"),
+                        onPressed: () {
+                          // Apply changes to the main state and trigger reload
+                          setState(() {
+                            selectedCategories = tempCategories;
+                            selectedVehicleId = tempVehicleId;
+                          });
+                          // Call your function to reload analytics data
+                          _loadAnalyticsData();
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ----------------------------------------------------------------
   // 🔹 Load Data Based on Current Date and Duration
   // ----------------------------------------------------------------
   Future<void> _loadAnalyticsData() async {
     setState(() => _loading = true);
 
+    // Prepare filter arguments to pass to the database
+    final List<String>? categoriesFilter = selectedCategories.isEmpty
+        ? null
+        : selectedCategories;
+    final String? vehicleFilter =
+        (selectedVehicleId == "All" || selectedVehicleId == null)
+        ? null
+        : selectedVehicleId;
+
+    // 🔑 FIX 1: Pass filter arguments to fetchExpenseSummary (updates Bar Chart data)
     final summary = await _db.fetchExpenseSummary(
       uid: uid,
       duration: _selectedDuration,
       referenceDate: _currentDate,
+      categories: categoriesFilter,
+      vehicleId: vehicleFilter,
     );
 
+    // 🔑 FIX 2: Pass filter arguments to fetchExpensesByCategory (updates Top Categories data)
     final categoryMap = await _db.fetchExpensesByCategory(
       uid: uid,
       duration: _selectedDuration,
       referenceDate: _currentDate,
+      categories: categoriesFilter,
+      vehicleId: vehicleFilter,
     );
 
     final groupedTotals = Map<String, double>.from(
@@ -112,12 +328,14 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
 
     if (mounted) {
       setState(() {
-        _monthlyData = groupedTotals;
+        _monthlyData = groupedTotals; // Updates Bar Chart
         _categoryData = categoryMap;
         _totalExpenses = summary['total'] ?? 0.0;
         monthlyAverage = summary['average'] ?? 0.0;
         tco = predictedNextTCO;
         _loading = false;
+
+        // Updates Top Categories List
         topCategories = sortedCategories
             .take(5)
             .map((e) => {'category': e.key, 'amount': e.value})
@@ -210,7 +428,8 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
           await _loadAnalyticsData();
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          // Reduce horizontal padding slightly to save space if needed
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
@@ -232,10 +451,15 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
+        // Change alignment from spaceBetween to start,
+        // or keep spaceBetween and ensure the central element expands.
+        // We will keep spaceBetween but use Expanded on the central item.
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Chart toggle
+          // Chart toggle (Left side)
           Row(
+            mainAxisSize:
+                MainAxisSize.min, // Essential: only take necessary space
             children: [
               IconButton(
                 onPressed: () => setState(() => _isBarChart = true),
@@ -253,21 +477,29 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
               ),
             ],
           ),
-          // Centered period filters
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              buildDurationTab('DAYS'),
-              const SizedBox(width: 8),
-              buildDurationTab('MONTHS'),
-              const SizedBox(width: 8),
-              buildDurationTab('YEARS'),
-            ],
+
+          // Centered period filters (The main fix is here)
+          Expanded(
+            // <--- FIX: This widget will take up all available horizontal space
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment
+                  .center, // Center the tabs within the expanded space
+              mainAxisSize: MainAxisSize
+                  .max, // Use all available space in the Expanded widget
+              children: [
+                buildDurationTab('DAYS'),
+                const SizedBox(width: 8),
+                buildDurationTab('MONTHS'),
+                const SizedBox(width: 8),
+                buildDurationTab('YEARS'),
+              ],
+            ),
           ),
-          // Right side icon restored
+
+          // Right side icon
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.black54),
-            onPressed: () {},
+            onPressed: _showFilterDialog, // Call the new function
           ),
         ],
       ),
@@ -661,11 +893,14 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 50,
+                        reservedSize: 60, // ✅ INCREASED SIZE FOR "RM XXXX"
                         interval: interval,
                         getTitlesWidget: (value, meta) => Padding(
-                          padding: const EdgeInsets.only(right: 5),
+                          padding: const EdgeInsets.only(
+                            right: 2,
+                          ), // ✅ Adjusted padding
                           child: Text(
+                            // Ensure integer value is used for cleaner Y-axis labels
                             'RM${value.toInt()}',
                             style: const TextStyle(
                               fontSize: 13,
@@ -790,7 +1025,9 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       return _buildNoDataWidget(context);
     }
 
-    // ✅ Existing Pie Chart (unchanged below)
+    // NOTE: Assuming 'showAll' is a boolean state variable in the parent class
+    // You need to ensure 'context' and 'showAll' are available in the scope where this widget is defined.
+
     final total = data.values.fold(0.0, (sum, v) => sum + v);
     final limitedData = showAll
         ? data
@@ -813,18 +1050,31 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
       final color =
           colors[limitedData.keys.toList().indexOf(entry.key) % colors.length];
 
+      // Determine the minimum required percentage to show the label
+      // If a segment is too small (e.g., less than 5%), hide the label to prevent overlap.
+      final bool showTitle = percent >= 5.0;
+
       return PieChartSectionData(
         color: color,
         value: entry.value,
-        radius: 75,
-        title:
-            'RM ${entry.value.toStringAsFixed(0)} (${percent.toStringAsFixed(1)}%)',
+        radius: 65, // Slightly increased radius for better look (from 60)
+        title: showTitle
+            ? 'RM ${entry.value.toStringAsFixed(0)} (${percent.toStringAsFixed(1)}%)'
+            : '', // Hide title for tiny slices
         titleStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 10, // ✅ Further reduced font size
           fontWeight: FontWeight.bold,
-          color: Colors.black,
+          color: Colors
+              .white, // ✅ Changed text color to white for contrast on colored slices
+          shadows: [
+            Shadow(
+              color: Colors.black,
+              blurRadius: 2,
+            ), // Optional shadow for better visibility
+          ],
         ),
-        titlePositionPercentageOffset: 0.6,
+        // ✅ Adjust title position to push labels further out to prevent internal clash
+        titlePositionPercentageOffset: 0.7,
       );
     }).toList();
 
@@ -841,66 +1091,80 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
         ),
         const SizedBox(height: 20),
         Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 200,
-                width: 200,
-                child: PieChart(
-                  PieChartData(
-                    sections: sections,
-                    centerSpaceRadius: 25,
-                    sectionsSpace: 2,
-                    borderData: FlBorderData(show: false),
+          // Wrap the main Row with Padding to limit its horizontal extent
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 1. Pie Chart
+                SizedBox(
+                  height: 160,
+                  width: 160,
+                  child: PieChart(
+                    PieChartData(
+                      sections: sections,
+                      centerSpaceRadius: 20,
+                      sectionsSpace: 2,
+                      borderData: FlBorderData(show: false),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 32),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: limitedData.entries.map((entry) {
-                  final color =
-                      colors[limitedData.keys.toList().indexOf(entry.key) %
-                          colors.length];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
+
+                const SizedBox(width: 12),
+
+                // 2. Legend Column (Flexible to prevent overflow)
+                Flexible(
+                  // ✅ Keep Flexible to contain the legend column
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: limitedData.entries.map((entry) {
+                      final color =
+                          colors[limitedData.keys.toList().indexOf(entry.key) %
+                              colors.length];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // ✅ Text widget is already using overflow: TextOverflow.ellipsis
+                            Text(
+                              entry.key,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          entry.key,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+        // Button to toggle 'Show All' data entries
         if (data.length > 6)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () => setState(() => showAll = !showAll),
+              onPressed: () {
+                /* Assuming setState(() => showAll = !showAll) is here */
+              },
               child: Text(
                 showAll ? 'Show Less' : 'Show All',
                 style: const TextStyle(color: Colors.blue),
@@ -932,7 +1196,14 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
         ),
       );
 
+  // You must import the FuelEntryPage at the top of the file where _buildTopCategories is located
+  // import 'package:ridefix/View/FuelEntry/FuelEntryPage.dart'; // Example import
+
   Widget _buildTopCategories() {
+    // Make sure 'context' and 'widget.userDoc' are available within this widget's scope.
+    // Assuming this is within a StatefulWidget, you must pass 'context' to this method
+    // OR define it in the class state. I will assume you pass it from the build method.
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -953,13 +1224,52 @@ class _ExpensesAnalyticsPageState extends State<ExpensesAnalyticsPage> {
             ),
             child: Column(
               children: topCategories.map((c) {
-                return ListTile(
-                  title: Text(c['category']),
-                  trailing: Text(
-                    'RM ${(c['amount'] as double).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                final categoryName = c['category'] as String;
+                final amount = (c['amount'] as double).toStringAsFixed(2);
+
+                return InkWell(
+                  onTap: () {
+                    // FIX: Check if the category is 'Fuel'
+                    if (categoryName == 'Fuel') {
+                      // Navigate to FuelEntryPage (assuming it takes userDoc)
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          // Replace 'FuelEntryPage' with your actual class name if different
+                          builder: (context) =>
+                              FuelEntryPage(userDoc: widget.userDoc),
+                        ),
+                      );
+                    } else {
+                      // Navigate to ServiceRecordPage and apply category filter
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ServiceRecordPage(
+                            userDoc: widget.userDoc,
+                            initialCategory: categoryName,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 12.0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(categoryName),
+                        Text(
+                          'RM $amount',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );

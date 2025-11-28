@@ -5,72 +5,7 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 // import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
-/// VEHICLE MODEL
-class Vehicle {
-  final String vehicleId;
-  final String brand;
-  final String color;
-  final String model;
-  final String plateNumber;
-  final int manYear;
-  final String uid;
-  final String roadTaxExpired;
-  final int mileage;
-  final String imageUrl;
-
-  Vehicle({
-    required this.vehicleId,
-    required this.brand,
-    required this.color,
-    required this.model,
-    required this.plateNumber,
-    required this.manYear,
-    required this.uid,
-    required this.roadTaxExpired,
-    required this.mileage,
-    required this.imageUrl,
-  });
-
-  factory Vehicle.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
-    int safeParseInt(dynamic value, {int defaultValue = 0}) {
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? defaultValue;
-      return defaultValue;
-    }
-
-    return Vehicle(
-      vehicleId: data['Vehicleid'] ?? doc.id,
-      brand: data['Brand'] ?? '',
-      color: data['Color'] ?? '',
-      model: data['Model'] ?? '',
-      plateNumber: data['Platenumber'] ?? '',
-      manYear: safeParseInt(data['Manyear']),
-      uid: data['uid'] ?? '',
-      roadTaxExpired: data['Roadtaxexpired'] ?? '',
-      mileage: safeParseInt(data['mileage']),
-      imageUrl: data['imageUrl'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'Vehicleid': vehicleId,
-      'Brand': brand,
-      'Color': color,
-      'Model': model,
-      'Platenumber': plateNumber,
-      'Manyear': manYear,
-      'uid': uid,
-      'Roadtaxexpired': roadTaxExpired,
-      'mileage': mileage,
-      'imageUrl': imageUrl,
-    };
-  }
-}
+import 'package:ridefix/Model/vehicle_maintenance_model.dart';
 
 /// VEHICLE DATA SERVICE
 class VehicleDataService {
@@ -448,6 +383,108 @@ class VehicleDataService {
         );
       }
     }
+  }
+
+  // 1. Get total service records count
+  Future<int> getServiceCount(String vehicleId, String uid) async {
+    // ⚠️ CORRECTED: Use .count() and then access the property .count
+    final snapshot = await _firestore
+        .collection('ServiceRecord')
+        .where('vehicleId', isEqualTo: vehicleId)
+        .where('uid', isEqualTo: uid)
+        .count()
+        .get();
+
+    // ✅ Access the count property on the result
+    return snapshot.count ?? 0;
+  }
+
+  // 2. Get total fuel entries count
+  Future<int> getFuelEntryCount(String vehicleId, String uid) async {
+    // ⚠️ CORRECTED: Use .count() and then access the property .count
+    final snapshot = await _firestore
+        .collection('FuelEntry')
+        .where('vehicleId', isEqualTo: vehicleId)
+        .where('uid', isEqualTo: uid)
+        .count()
+        .get();
+
+    // ✅ Access the count property on the result
+    return snapshot.count ?? 0;
+  }
+
+  Future<Map<String, double>> getExpenseSummary(
+    String vehicleId,
+    String uid,
+  ) async {
+    double totalExpenses = 0.0;
+    DateTime? firstEntryDate;
+
+    // Fetch Service Records (need to read docs for sum and date)
+    final serviceSnapshot = await _firestore
+        .collection('ServiceRecord')
+        .where('vehicleId', isEqualTo: vehicleId)
+        .where('uid', isEqualTo: uid)
+        .get();
+
+    for (var doc in serviceSnapshot.docs) {
+      // Sum the amount and find the oldest entry date
+      totalExpenses += (doc.data()['amount'] as num?)?.toDouble() ?? 0.0;
+
+      final createdAt = doc.data()['createdAt'] as Timestamp?;
+      if (createdAt != null) {
+        final date = createdAt.toDate();
+        if (firstEntryDate == null || date.isBefore(firstEntryDate)) {
+          firstEntryDate = date;
+        }
+      }
+    }
+
+    // Fetch Fuel Entries
+    final fuelSnapshot = await _firestore
+        .collection('FuelEntry')
+        .where('vehicleId', isEqualTo: vehicleId)
+        .where('uid', isEqualTo: uid)
+        .get();
+
+    for (var doc in fuelSnapshot.docs) {
+      // Sum the amount and find the oldest entry date
+      totalExpenses += (doc.data()['amount'] as num?)?.toDouble() ?? 0.0;
+
+      final createdAt = doc.data()['createdAt'] as Timestamp?;
+      if (createdAt != null) {
+        final date = createdAt.toDate();
+        if (firstEntryDate == null || date.isBefore(firstEntryDate)) {
+          firstEntryDate = date;
+        }
+      }
+    }
+
+    double avgMonthlyExpenses = 0.0;
+    if (totalExpenses > 0 && firstEntryDate != null) {
+      final now = DateTime.now();
+
+      // Calculate the difference in full months
+      int months =
+          (now.year - firstEntryDate.year) * 12 +
+          now.month -
+          firstEntryDate.month;
+
+      // Adjust for day-of-month (e.g., if oldest entry was 25th Jan and today is 15th Feb, only 1 full month has passed)
+      if (now.day < firstEntryDate.day) {
+        months -= 1;
+      }
+
+      // Ensure at least 1 month is used for division if data exists
+      final trackingDurationInMonths = months > 0 ? months : 1;
+
+      avgMonthlyExpenses = totalExpenses / trackingDurationInMonths;
+    }
+
+    return {
+      'totalExpenses': totalExpenses,
+      'avgMonthlyExpenses': avgMonthlyExpenses,
+    };
   }
 }
 

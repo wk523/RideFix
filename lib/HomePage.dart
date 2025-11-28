@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:ridefix/View/ExpensesAnalytics/ExpensesAnalytics.dart';
-import 'package:ridefix/View/Fuel&MileageAnalytics/AddFuelEntry.dart';
-import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
+import 'package:ridefix/View/Fuel&MileageAnalytics/FuelAnalytics.dart';
+import 'package:ridefix/View/Fuel&MileageAnalytics/FuelEntry.dart';
+import 'package:ridefix/View/RoadsideEmergency/EmergencyService.dart';
 import 'package:ridefix/View/ServiceRecord/ServiceRecord.dart';
 import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../Controller/EmergencyService/EmergencyServiceController.dart';
+
 
 class HomePage extends StatelessWidget {
   final DocumentSnapshot userDoc;
@@ -16,7 +20,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CarCare Vehicle Tracker',
+      title: 'RideFix',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -235,6 +239,8 @@ class ExpenseBar extends StatelessWidget {
 
 // --- 3. Navigation Drawer Widget (Left Panel) ---
 
+// --- 3. Navigation Drawer Widget (Left Panel) ---
+
 class AppDrawer extends StatelessWidget {
   final DocumentSnapshot userDoc;
 
@@ -246,6 +252,7 @@ class AppDrawer extends StatelessWidget {
     required VoidCallback onTap,
     bool isSelected = false,
   }) {
+    // ... (No change to this helper function)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: Material(
@@ -283,6 +290,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   Widget _buildHeader(String title) {
+    // ... (No change)
     return Padding(
       padding: const EdgeInsets.only(left: 20.0, top: 16.0, bottom: 8.0),
       child: Text(
@@ -299,7 +307,6 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Current page is hardcoded to 'Home' for this single-page example
     const String currentPage = 'Home';
 
     return Drawer(
@@ -307,7 +314,7 @@ class AppDrawer extends StatelessWidget {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: Column(
         children: [
-          // Branding Header
+          // Branding Header (No change)
           Padding(
             padding: const EdgeInsets.only(
               top: 40.0,
@@ -327,7 +334,7 @@ class AppDrawer extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'CarCare',
+                      'RideFix',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -363,13 +370,15 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Home',
                   icon: Icons.home_outlined,
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => Navigator.pop(context), // Close the drawer
                   isSelected: currentPage == 'Home',
                 ),
                 _buildDrawerItem(
                   title: 'My Vehicles',
                   icon: Icons.directions_car_outlined,
                   onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -381,12 +390,17 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Reminders',
                   icon: Icons.access_time,
-                  onTap: () {},
+                  onTap: () {
+                    // Close the drawer before executing
+                    Navigator.pop(context);
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Service Records',
                   icon: Icons.file_copy_outlined,
                   onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -402,27 +416,37 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   title: 'Workshop Locator',
                   icon: Icons.map_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    // Close the drawer before executing
+                    Navigator.pop(context);
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Troubleshooting',
                   icon: Icons.search,
-                  onTap: () {},
+                  onTap: () {
+                    // Close the drawer before executing
+                    Navigator.pop(context);
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Parking Tracker',
                   icon: Icons.local_parking_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    // Close the drawer before executing
+                    Navigator.pop(context);
+                  },
                 ),
                 _buildDrawerItem(
                   title: 'Fuel Tracking',
                   icon: Icons.local_gas_station_outlined,
                   onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            AddFuelEntryPage(userDoc: userDoc),
+                        builder: (context) => FuelEntryPage(userDoc: userDoc),
                       ),
                     );
                   },
@@ -434,6 +458,8 @@ class AppDrawer extends StatelessWidget {
                   title: 'Expense Analytics',
                   icon: Icons.trending_up,
                   onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -444,21 +470,49 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 _buildDrawerItem(
+                  title: 'Fuel Analytics',
+                  icon: Icons.trending_up,
+                  onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            FuelAnalyticsPage(userDoc: userDoc),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
                   title: 'Emergency Assistance',
                   icon: Icons.help_outline,
-                  onTap: () {},
+                  onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
+
+                    // 🔥 FIX: Removed the redundant ChangeNotifierProvider wrapper
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EmergencyServicePage(userDoc: userDoc),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
           ),
 
-          // User Profile Footer
+          // User Profile Footer (No change in navigation logic here, only for profile)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 InkWell(
                   onTap: () {
+                    // Close the drawer before navigating
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => ProfileScreen()),
@@ -678,11 +732,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.phone_enabled_outlined,
                       label: 'Emergency SOS',
                       color: Colors.red.shade500,
-                      onTap: () {},
+                      onTap: () {
+                        // 🔥 FIX: Removed the redundant ChangeNotifierProvider wrapper
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EmergencyServicePage(userDoc: widget.userDoc),
+                          ),
+                        );
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.access_time,
-                      label: 'Add Reminder',
+                      label: 'Maintenance Reminder',
                       color: Colors.blue.shade500,
                       onTap: () {
                         Navigator.push(
@@ -701,14 +763,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     QuickActionButton(
                       icon: Icons.add_card_outlined,
-                      label: 'Add Service',
+                      label: 'Service Record',
                       color: Colors.blue.shade500,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                AddServiceRecordPage(userDoc: widget.userDoc),
+                                ServiceRecordPage(userDoc: widget.userDoc),
                           ),
                         );
                       },
@@ -817,14 +879,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      ...expenses
-                          .map(
-                            (exp) => ExpenseBar(
-                              expense: exp,
-                              totalAmount: totalExpenseAmount,
-                            ),
-                          )
-                          .toList(),
+                      ...expenses.map(
+                        (exp) => ExpenseBar(
+                          expense: exp,
+                          totalAmount: totalExpenseAmount,
+                        ),
+                      ),
                     ],
                   ),
                 ),

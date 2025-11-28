@@ -2,24 +2,99 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class ExpensesAnalyticsDatabase {
-  final CollectionReference _records = FirebaseFirestore.instance.collection(
-    'ServiceRecord',
-  );
+  final CollectionReference _serviceRecords = FirebaseFirestore.instance
+      .collection('ServiceRecord');
+  // Collection reference for FuelEntry
+  final CollectionReference _fuelRecords = FirebaseFirestore.instance
+      .collection('FuelEntry');
 
-  /// Returns summary by selected duration:
-  /// 'DAYS'  -> group by day (Mon..Sun)
-  /// 'MONTHS'-> group by week (Week 1..Week N)
-  /// 'YEARS' -> group by month (Jan..Dec)
+  // --- Helper to Fetch and Merge Records ---
+
+  /// Fetches records from both ServiceRecord and FuelEntry collections for the given user,
+  /// ensuring FuelEntry items are labeled with the category 'Fuel'.
+  Future<List<Map<String, dynamic>>> _fetchAllRecords({
+    required String uid,
+    // New optional filter parameters
+    List<String>? categories,
+    String? vehicleId,
+  }) async {
+    // 1. Base Query with UID
+    Query serviceQuery = _serviceRecords.where('uid', isEqualTo: uid);
+    Query fuelQuery = _fuelRecords.where('uid', isEqualTo: uid);
+
+    // 2. Apply Vehicle Filter (applies to both)
+    if (vehicleId != null && vehicleId.isNotEmpty) {
+      serviceQuery = serviceQuery.where('vehicleId', isEqualTo: vehicleId);
+      fuelQuery = fuelQuery.where('vehicleId', isEqualTo: vehicleId);
+    }
+
+    // 3. Apply Category Filters
+    // Note: 'Fuel' is handled separately as it's not a ServiceRecord category.
+    final serviceCategories =
+        categories?.where((c) => c != 'Fuel').toList() ?? [];
+    final filterFuel = categories == null || categories.contains('Fuel');
+
+    if (serviceCategories.isNotEmpty) {
+      // Filter Service Records by category list
+      serviceQuery = serviceQuery.where('category', whereIn: serviceCategories);
+    } else if (categories != null &&
+        categories.isNotEmpty &&
+        !categories.contains('Fuel')) {
+      // If categories is provided, but 'Fuel' is not present, AND no service categories were selected,
+      // then the service record snapshot should be empty (or the query will fail if categories is empty).
+      // To avoid Firebase query limitations, we'll manually check the filter later if serviceCategories is empty.
+    }
+
+    // 4. Fetch Snapshots
+    final serviceSnapshot = await serviceQuery.get();
+    final fuelSnapshot = filterFuel ? await fuelQuery.get() : null;
+
+    List<Map<String, dynamic>> allRecords = [];
+
+    // Add Service Records
+    for (var doc in serviceSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      // Secondary manual filter if needed (though Firebase query should handle it)
+      if (serviceCategories.isEmpty &&
+          categories != null &&
+          categories.isNotEmpty &&
+          !categories.contains(data['category'])) {
+        continue; // Skip if it's not the required service category (unlikely, but safe)
+      }
+      allRecords.add(data);
+    }
+
+    // Add Fuel Entries, forcing category to 'Fuel'
+    if (filterFuel && fuelSnapshot != null) {
+      for (var doc in fuelSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['category'] = 'Fuel';
+        allRecords.add(data);
+      }
+    }
+
+    return allRecords;
+  }
+
+  // --- Core Analytics Functions ---
+
+  /// Returns summary grouped by selected duration (Day/Week/Month).
   Future<Map<String, dynamic>> fetchExpenseSummary({
     required String uid,
     required String duration,
-    required DateTime referenceDate, // ✅ Added parameter
+    required DateTime referenceDate,
+    List<String>? categories,
+    String? vehicleId,
   }) async {
-    final snapshot = await _records.where('uid', isEqualTo: uid).get();
+    final allRecords = await _fetchAllRecords(
+      uid: uid,
+      categories: categories,
+      vehicleId: vehicleId,
+    );
 
     final Map<String, double> groupedTotals = {};
 
-    // ✅ Define time range using referenceDate (so ← → navigation works)
+    // 1. Define time range based on duration
     late DateTime startDate;
     late DateTime endDate;
 
@@ -30,17 +105,19 @@ class ExpensesAnalyticsDatabase {
       endDate = startDate.add(const Duration(days: 6));
     } else if (duration == 'MONTHS') {
       startDate = DateTime(referenceDate.year, referenceDate.month, 1);
+      // Last day of the current month
       endDate = DateTime(referenceDate.year, referenceDate.month + 1, 0);
     } else {
+      // YEARS
       startDate = DateTime(referenceDate.year, 1, 1);
       endDate = DateTime(referenceDate.year, 12, 31);
     }
 
-    // 🔄 Filter records and group by period
-    for (final doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+    // 2. Filter records and group by period
+    for (final data in allRecords) {
       final amount = _parseDouble(data['amount']);
 
+      // Parse date from record data
       DateTime? date;
       final rawDate = data['date'];
       if (rawDate is String && rawDate.isNotEmpty) {
@@ -52,23 +129,23 @@ class ExpensesAnalyticsDatabase {
       }
       if (date == null) continue;
 
-      // ✅ Filter only entries within range
+      // Filter only entries within range
       if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
 
       late String key;
       if (duration == 'DAYS') {
-        key = DateFormat('E').format(date);
+        key = DateFormat('E').format(date); // Mon, Tue, etc.
       } else if (duration == 'MONTHS') {
         final weekNumber = ((date.day - 1) / 7).floor() + 1;
         key = 'Week $weekNumber';
       } else {
-        key = DateFormat('MMM').format(date);
+        key = DateFormat('MMM').format(date); // Jan, Feb, etc.
       }
 
       groupedTotals[key] = (groupedTotals[key] ?? 0.0) + amount;
     }
 
-    // Fill missing labels for completeness
+    // 3. Fill missing labels for completeness
     if (duration == 'DAYS') {
       for (final d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
         groupedTotals.putIfAbsent(d, () => 0.0);
@@ -102,6 +179,7 @@ class ExpensesAnalyticsDatabase {
       }
     }
 
+    // 4. Calculate Summary Metrics
     final total = groupedTotals.values.fold(0.0, (a, b) => a + b);
     final bucketCount = duration == 'DAYS'
         ? 7
@@ -113,7 +191,7 @@ class ExpensesAnalyticsDatabase {
     final average = bucketCount > 0 ? total / bucketCount : 0.0;
     final tco = average * 6;
 
-    // Sort logically by label order
+    // 5. Sort logically by label order
     final sortedKeys = groupedTotals.keys.toList()
       ..sort((a, b) {
         if (duration == 'DAYS') {
@@ -155,12 +233,11 @@ class ExpensesAnalyticsDatabase {
   /// 🔮 Predicts future total cost (TCO) for next 6 months
   /// using linear regression based on historical monthly totals.
   Future<Map<String, dynamic>> predictTCO({required String uid}) async {
-    final snapshot = await _records.where('uid', isEqualTo: uid).get();
+    final allRecords = await _fetchAllRecords(uid: uid);
 
     // Step 1: Build monthly totals (past 12 months)
     final Map<String, double> monthlyTotals = {};
-    for (final doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+    for (final data in allRecords) {
       final amount = _parseDouble(data['amount']);
 
       DateTime? date;
@@ -184,18 +261,15 @@ class ExpensesAnalyticsDatabase {
       return {'predictedTotal': 0.0, 'monthlyProjection': List.filled(6, 0.0)};
     }
 
-    // Step 2: Sort months chronologically
+    // Step 2-5: Linear Regression and Prediction (unchanged)
     final sortedKeys = monthlyTotals.keys.toList()
       ..sort((a, b) => a.compareTo(b));
     final values = sortedKeys.map((k) => monthlyTotals[k]!).toList();
-
-    // Step 3: Keep only last 12 months
     final recentValues = values.length > 12
         ? values.sublist(values.length - 12)
         : values;
     final n = recentValues.length;
 
-    // Step 4: Linear regression
     final xVals = List.generate(n, (i) => i + 1);
     final xMean = xVals.reduce((a, b) => a + b) / n;
     final yMean = recentValues.reduce((a, b) => a + b) / n;
@@ -208,7 +282,6 @@ class ExpensesAnalyticsDatabase {
     final slope = deno == 0 ? 0.0 : nume / deno;
     final intercept = yMean - slope * xMean;
 
-    // Step 5: Predict next 6 months
     final predictions = <double>[];
     for (int i = n + 1; i <= n + 6; i++) {
       final y = intercept + slope * i;
@@ -223,14 +296,23 @@ class ExpensesAnalyticsDatabase {
   Future<Map<String, double>> fetchExpensesByCategory({
     required String uid,
     required String duration,
-    required DateTime referenceDate, // ✅ Added parameter
+    required DateTime referenceDate,
+    // Pass-through filters
+    List<String>? categories,
+    String? vehicleId,
   }) async {
-    final snapshot = await _records.where('uid', isEqualTo: uid).get();
+    // MODIFIED: Pass filters to _fetchAllRecords
+    final allRecords = await _fetchAllRecords(
+      uid: uid,
+      categories: categories,
+      vehicleId: vehicleId,
+    );
     final Map<String, double> map = {};
 
     late DateTime startDate;
     late DateTime endDate;
 
+    // Define time range based on duration (same logic as summary)
     if (duration == 'DAYS') {
       startDate = referenceDate.subtract(
         Duration(days: referenceDate.weekday - 1),
@@ -244,8 +326,8 @@ class ExpensesAnalyticsDatabase {
       endDate = DateTime(referenceDate.year, 12, 31);
     }
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+    for (final data in allRecords) {
+      // Category is guaranteed to be present and correct due to _fetchAllRecords
       final category = (data['category'] ?? 'Unknown').toString();
       final amount = _parseDouble(data['amount']);
 
@@ -262,7 +344,7 @@ class ExpensesAnalyticsDatabase {
       }
       if (date == null) continue;
 
-      // ✅ Only include entries within the target date range
+      // Only include entries within the target date range
       if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
 
       map[category] = (map[category] ?? 0.0) + amount;
@@ -270,6 +352,8 @@ class ExpensesAnalyticsDatabase {
 
     return map;
   }
+
+  // --- Utility ---
 
   double _parseDouble(dynamic v) {
     if (v == null) return 0.0;

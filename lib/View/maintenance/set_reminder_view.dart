@@ -110,7 +110,7 @@ class _SetReminderViewState extends State<SetReminderView> {
           children: [
             const Text("CATEGORY"),
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               hint: const Text("Select category"),
               items: _categories
                   .map(

@@ -2,8 +2,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:ridefix/Controller/ServiceRecord/ServiceRecordDatabase.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
+import 'package:ridefix/Controller/ServiceRecord/ServiceRecordController.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:ridefix/View/ServiceRecord/AddServiceRecord.dart';
@@ -11,8 +11,13 @@ import 'package:ridefix/View/ServiceRecord/ServiceRecordDetails.dart';
 
 class ServiceRecordPage extends StatefulWidget {
   final DocumentSnapshot userDoc;
+  final String? initialCategory;
 
-  const ServiceRecordPage({super.key, required this.userDoc});
+  const ServiceRecordPage({
+    super.key,
+    required this.userDoc,
+    this.initialCategory,
+  });
 
   @override
   State<ServiceRecordPage> createState() => _ServiceRecordPageState();
@@ -23,6 +28,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
   final VehicleDataService vehicleService = VehicleDataService();
 
   String selectedSort = "date";
+  // Change to List<String?> to allow null but clear on reset if needed
   List<String> selectedCategories = [];
   DateTimeRange? selectedDateRange;
   String? selectedVehicleId;
@@ -33,6 +39,12 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
   void initState() {
     super.initState();
     uid = FirebaseAuth.instance.currentUser!.uid;
+
+    // --- FIX: Apply initial category filter if passed ---
+    if (widget.initialCategory != null) {
+      selectedCategories.add(widget.initialCategory!);
+      // Note: We don't change the sort, date range, or vehicle ID unless explicitly filtered.
+    }
   }
 
   Map<String, String> vehicleNames = {};
@@ -146,7 +158,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                   // SORT SECTION
                   _sectionHeader(Icons.sort, "Sort by"),
                   DropdownButtonFormField<String>(
-                    value: tempSort,
+                    initialValue: tempSort,
                     decoration: _dropdownDecoration(),
                     items: const [
                       DropdownMenuItem(
@@ -184,10 +196,11 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                           selectedColor: Colors.blue,
                           onSelected: (v) {
                             setModalState(() {
-                              if (v)
+                              if (v) {
                                 tempCategories.add(cat);
-                              else
+                              } else {
                                 tempCategories.remove(cat);
+                              }
                             });
                           },
                         ),
@@ -237,7 +250,7 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                       }
 
                       return DropdownButtonFormField<String>(
-                        value: tempVehicleId ?? "All",
+                        initialValue: tempVehicleId ?? "All",
                         decoration: _dropdownDecoration(),
                         items: [
                           const DropdownMenuItem(
@@ -366,8 +379,8 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
                 const SizedBox(width: 10),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text("Reset"),
                   onPressed: _resetFilters,
+                  child: const Text("Reset"),
                 ),
               ],
             ),

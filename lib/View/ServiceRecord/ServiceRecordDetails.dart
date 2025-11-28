@@ -18,6 +18,8 @@ class ServiceRecordDetailsPage extends StatelessWidget {
         (record['imgURL'] is String && (record['imgURL'] as String).isNotEmpty)
         ? record['imgURL']
         : null;
+
+    // The plate number is correctly extracted into a local variable
     final plateNumber = record['plateNumber'] ?? 'N/A';
 
     // ✅ Merge and clean record data
@@ -30,11 +32,17 @@ class ServiceRecordDetailsPage extends StatelessWidget {
               'vehicleId',
               'imgURL',
               'createdAt',
+              // Temporarily exclude 'plateNumber' from this filter block
             ].contains(key) ||
             (value == null || value.toString().trim().isEmpty),
       );
 
-    // ✅ Display labels for known keys
+    // 💡 FIX: Explicitly add or update plateNumber using the local variable
+    // This ensures 'plateNumber' is always present in the map, even if the
+    // original record had it as null/empty, which means it will display 'N/A'.
+    displayData['plateNumber'] = plateNumber;
+
+    // ✅ Display labels for known keys (No change needed here)
     final Map<String, String> displayLabels = {
       'category': 'Category',
       'date': 'Date',

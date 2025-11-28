@@ -74,12 +74,15 @@ class _EditActiveReminderPageState extends State<EditActiveReminderPage> {
       final difference = reminderDateTime.difference(DateTime.now());
 
       if (difference.isNegative) return 'Expired';
-      if (difference.inDays > 0)
+      if (difference.inDays > 0) {
         return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} left';
-      if (difference.inHours > 0)
+      }
+      if (difference.inHours > 0) {
         return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} left';
-      if (difference.inMinutes > 0)
+      }
+      if (difference.inMinutes > 0) {
         return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} left';
+      }
 
       return 'Less than a minute';
     } catch (e) {

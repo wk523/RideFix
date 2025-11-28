@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ridefix/View/troubleshoot/qna_upload_view.dart';
 import 'package:ridefix/controller/qna_controller.dart';
 import 'package:ridefix/model/qna_model.dart';
