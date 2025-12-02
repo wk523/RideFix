@@ -6,12 +6,14 @@ import 'package:ridefix/View/RoadsideEmergency/EmergencyService.dart';
 import 'package:ridefix/View/ServiceRecord/ServiceRecord.dart';
 import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+import 'package:ridefix/View/parking/parking_main_page.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
+import 'package:ridefix/View/workshop/workshop_locator_page.dart';
 import '../../Controller/EmergencyService/EmergencyServiceController.dart';
-
 
 class HomePage extends StatelessWidget {
   final DocumentSnapshot userDoc;
@@ -239,8 +241,6 @@ class ExpenseBar extends StatelessWidget {
 
 // --- 3. Navigation Drawer Widget (Left Panel) ---
 
-// --- 3. Navigation Drawer Widget (Left Panel) ---
-
 class AppDrawer extends StatelessWidget {
   final DocumentSnapshot userDoc;
 
@@ -391,8 +391,13 @@ class AppDrawer extends StatelessWidget {
                   title: 'Reminders',
                   icon: Icons.access_time,
                   onTap: () {
-                    // Close the drawer before executing
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MaintenanceMainView(),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
@@ -417,24 +422,39 @@ class AppDrawer extends StatelessWidget {
                   title: 'Workshop Locator',
                   icon: Icons.map_outlined,
                   onTap: () {
-                    // Close the drawer before executing
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => WorkshopLocatorPage(),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
                   title: 'Troubleshooting',
                   icon: Icons.search,
                   onTap: () {
-                    // Close the drawer before executing
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TroubleshootingPage(),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
                   title: 'Parking Tracker',
                   icon: Icons.local_parking_outlined,
                   onTap: () {
-                    // Close the drawer before executing
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ParkingMainPage(),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
@@ -495,7 +515,8 @@ class AppDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EmergencyServicePage(userDoc: userDoc),
+                        builder: (context) =>
+                            EmergencyServicePage(userDoc: userDoc),
                       ),
                     );
                   },
@@ -737,7 +758,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EmergencyServicePage(userDoc: widget.userDoc),
+                            builder: (context) =>
+                                EmergencyServicePage(userDoc: widget.userDoc),
                           ),
                         );
                       },
@@ -759,7 +781,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.location_on_outlined,
                       label: 'Find Workshop',
                       color: Colors.blue.shade500,
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WorkshopLocatorPage(),
+                          ),
+                        );
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.add_card_outlined,
