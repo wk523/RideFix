@@ -231,20 +231,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: const [
             Icon(Icons.logout, size: 50, color: Colors.blue),
             SizedBox(height: 8),
-            Text("Confirm to log out?", textAlign: TextAlign.center),
-          ],
+            Text("Confirm to log out?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black),
+            )],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
+            child: const Text("Cancel",style: TextStyle(color: Colors.black),
+          )),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text("Confirm"),
+            child: const Text("Confirm",style: TextStyle(color: Colors.black),
           ),
-        ],
+          )],
       ),
     );
 
@@ -331,8 +331,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                 ),
-                child: const Text('Save Changes'),
-              ),
+                child: const Text('Save Changes',style: TextStyle(color: Colors.black),
+                )),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _changePassword,

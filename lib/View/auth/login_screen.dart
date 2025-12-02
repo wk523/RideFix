@@ -1,8 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ridefix/HomePage.dart';
-import '/widgets/custom_textfield.dart';
+import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
+import 'package:ridefix/View/parking/parking_main_page.dart';
+import 'package:ridefix/View/profile/profile_screen.dart';
+import 'package:ridefix/View/troubleshoot/qna_list_view.dart';
+import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
+import 'package:ridefix/View/workshop/workshop_locator_page.dart';
+import 'package:ridefix/widgets/custom_textfield.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -32,21 +36,17 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      final user = FirebaseAuth.instance.currentUser!;
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Login successful!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login successful!')),
+      );
 
       // ✅ Navigate to GuideScreen after successful login
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage(userDoc: userDoc)),
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
+
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Login failed';
       if (e.code == 'user-not-found') {
@@ -57,13 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
         errorMessage = 'Invalid email format.';
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
   }
+
 
   @override
   void dispose() {
@@ -91,10 +92,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    "Login to your account!",
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  const Text("Login to your account!",
+                      style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 32),
 
                   // 🔹 Email
@@ -160,22 +159,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 60,
-                      ),
+                          vertical: 14, horizontal: 60),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                         : const Text("Login", style: TextStyle(fontSize: 16)),
                   ),
 
@@ -191,8 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const RegisterScreen(),
-                            ),
+                                builder: (context) => const RegisterScreen()),
                           );
                         },
                         child: const Text(

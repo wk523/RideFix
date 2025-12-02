@@ -10,7 +10,7 @@ class TroubleGuideController {
         .where('category', isEqualTo: category)
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => TroubleGuideItem.fromFirestore(doc.data(), doc.id))
+        .map((doc) => TroubleGuideItem.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
         .toList());
   }
 }
