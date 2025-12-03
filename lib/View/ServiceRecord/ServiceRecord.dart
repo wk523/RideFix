@@ -411,59 +411,101 @@ class _ServiceRecordPageState extends State<ServiceRecordPage> {
 
             // LIST OF RECORDS
             Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _getFilteredRecords(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+              child: StreamBuilder(
+                // 1. Outer Stream: Get all vehicles
+                stream: vehicleService.vehiclesStream,
+                builder: (context, vehicleSnapshot) {
+                  if (vehicleSnapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final records = snapshot.data!;
-                  if (records.isEmpty) {
-                    return const Center(child: Text("No records found"));
+                  // 1.1. Populate the vehicleNames map (Vehicle ID -> "Brand Model (PlateNumber)")
+                  if (vehicleSnapshot.hasData) {
+                    vehicleNames.clear();
+                    for (var v in vehicleSnapshot.data!) {
+                      // v is a Vehicle object from VehicleDataService
+                      vehicleNames[v.vehicleId] =
+                      "${v.brand} ${v.model} (${v.plateNumber})";
+                    }
+                  } else {
+                    vehicleNames.clear();
                   }
 
-                  return ListView.builder(
-                    itemCount: records.length,
-                    itemBuilder: (context, i) {
-                      final record = records[i];
+                  // 2. Inner Stream: Get the filtered service records
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _getFilteredRecords(),
+                    builder: (context, recordsSnapshot) {
+                      if (recordsSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                      final category = record["category"] ?? "Unknown";
-                      final date = record["date"] ?? "-";
-                      final amount = (record["amount"] ?? 0).toDouble();
+                      final records = recordsSnapshot.data ?? [];
+                      if (records.isEmpty) {
+                        return const Center(child: Text("No records found"));
+                      }
 
-                      return Card(
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: ListTile(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ServiceRecordDetailsPage(record: record),
-                              ),
-                            );
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blue.shade100,
-                            child: Icon(
-                              _getCategoryIcon(category),
-                              color: Colors.blue.shade700,
+                      return ListView.builder(
+                        itemCount: records.length,
+                        itemBuilder: (context, i) {
+                          final record = records[i];
+
+                          final category = record["category"] ?? "Unknown";
+                          final date = record["date"] ?? "-";
+                          final amount = (record["amount"] ?? 0).toDouble();
+
+                          // 3. Inject Plate Number (Now Full Vehicle String)
+                          final String? vehicleId = record["vehicleId"];
+                          // 💡 FIX: Initialize with default value
+                          String vehicleDisplayString = 'N/A';
+
+                          if (vehicleId != null &&
+                              vehicleNames.containsKey(vehicleId)) {
+                            // 🚀 CORRECTED LOGIC: Get the FULL string from the map (e.g., "TOYOTA SUPRA (BAB1)")
+                            vehicleDisplayString = vehicleNames[vehicleId]!;
+                          }
+
+                          // Create a mutable copy of the record and inject the full string
+                          Map<String, dynamic> recordToSend = Map.from(record);
+                          recordToSend['plateNumber'] = vehicleDisplayString; // Pass the full string
+
+                          return Card(
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
                             ),
-                          ),
-                          title: Text(
-                            category,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(date),
-                          trailing: Text(
-                            "RM${amount.toStringAsFixed(2)}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                            child: ListTile(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ServiceRecordDetailsPage(
+                                        record: recordToSend), // PASS ENRICHED RECORD
+                                  ),
+                                );
+                              },
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue.shade100,
+                                child: Icon(
+                                  _getCategoryIcon(category),
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                              title: Text(
+                                category,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(date),
+                              trailing: Text(
+                                "RM${amount.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   );

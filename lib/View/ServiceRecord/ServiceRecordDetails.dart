@@ -32,7 +32,7 @@ class ServiceRecordDetailsPage extends StatelessWidget {
               'vehicleId',
               'imgURL',
               'createdAt',
-              // Temporarily exclude 'plateNumber' from this filter block
+              'uid'
             ].contains(key) ||
             (value == null || value.toString().trim().isEmpty),
       );
@@ -48,7 +48,7 @@ class ServiceRecordDetailsPage extends StatelessWidget {
       'date': 'Date',
       'amount': 'Amount (RM)',
       'note': 'Note',
-      'plateNumber': 'Vehicle Plate',
+      'plateNumber': 'Vehicle', // <--- THIS IS THE ONLY REQUIRED CHANGE
     };
 
     return Scaffold(

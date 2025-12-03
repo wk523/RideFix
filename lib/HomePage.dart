@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
 import 'package:ridefix/View/workshop/workshop_locator_page.dart';
 import '../../Controller/EmergencyService/EmergencyServiceController.dart';
+import 'Controller/ExpensesAnalytics/ExpensesAnalyticsConrtoller.dart';
 
 class HomePage extends StatelessWidget {
   final DocumentSnapshot userDoc;
@@ -60,16 +61,8 @@ final List<Reminder> reminders = [
   Reminder('Tire Rotation', 'Maintenance', 'Oct 20, 2025', '10:47', 'Overdue'),
 ];
 
-final List<Expense> expenses = [
-  Expense('Fuel', 680, Colors.blue),
-  Expense('Maintenance', 350, Colors.red),
-  Expense('Parking & Toll', 215, Colors.amber),
-];
-
-final double totalExpenseAmount = expenses.fold(
-  0,
-  (sum, item) => sum + item.amount,
-);
+// Removed hardcoded expenses list and totalExpenseAmount
+// This data will now be fetched dynamically by ThisMonthExpenseOverview
 
 // --- 2. Custom Widgets for Dashboard ---
 
@@ -207,7 +200,8 @@ class ExpenseBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double percentage = expense.amount / totalAmount;
+    // Avoid division by zero
+    final double percentage = totalAmount > 0 ? expense.amount / totalAmount : 0;
 
     return Column(
       children: [
@@ -234,7 +228,227 @@ class ExpenseBar extends StatelessWidget {
             minHeight: 8,
           ),
         ),
+        const SizedBox(height: 8), // Added spacing between bars
       ],
+    );
+  }
+}
+
+// --- New Widget for Dynamic Expense Overview ---
+
+class ThisMonthExpenseOverview extends StatefulWidget {
+  final DocumentSnapshot userDoc;
+
+  const ThisMonthExpenseOverview({super.key, required this.userDoc});
+
+  @override
+  State<ThisMonthExpenseOverview> createState() =>
+      _ThisMonthExpenseOverviewState();
+}
+
+class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
+  // ⭐️ 1. Instantiate the actual database controller ⭐️
+  final _db = ExpensesAnalyticsDatabase();
+
+  double _totalAmount = 0.0;
+  List<Expense> _categoryExpenses = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchThisMonthExpenses(widget.userDoc.id);
+  }
+
+  // ⭐️ 2. Fetch data using the actual controller method ⭐️
+  Future<void> _fetchThisMonthExpenses(String userId) async {
+    // Current date is the reference date for the current month
+    final currentDate = DateTime.now();
+
+    try {
+      // Use fetchExpensesByCategory with 'MONTHS' duration to get the current month's totals
+      final Map<String, double> fetchedCategoryData =
+      await _db.fetchExpensesByCategory(
+        uid: userId,
+        duration: 'MONTHS', // We want the current month's breakdown
+        referenceDate: currentDate,
+      );
+
+      final double fetchedTotal = fetchedCategoryData.values.fold(
+        0.0,
+            (sum, amount) => sum + amount,
+      );
+
+      // Convert the fetched Map into a List<Expense>
+      final List<Expense> expensesList = fetchedCategoryData.entries.map((entry) {
+        // Map category names to colors for the dashboard bars
+        Color color = _getColorForCategory(entry.key);
+        return Expense(entry.key, entry.value, color);
+      }).toList();
+
+      // Sort expenses by amount (highest first)
+      expensesList.sort((a, b) => b.amount.compareTo(a.amount));
+
+      if (mounted) {
+        setState(() {
+          _totalAmount = fetchedTotal;
+          _categoryExpenses = expensesList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching dashboard expenses: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // ⭐️ 3. Helper function for consistent color mapping ⭐️
+  Color _getColorForCategory(String category) {
+    // You must match these colors to what you use in ExpensesAnalytics.dart for consistency
+    switch (category) {
+      case 'Fuel':
+        return Colors.blue;
+      case 'Maintenance':
+        return Colors.red;
+      case 'Parking & Toll':
+        return Colors.amber;
+      case 'Insurance':
+        return Colors.green;
+      case 'Repair':
+        return Colors.purple;
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Show loading indicator
+    if (_isLoading) {
+      // ... (Loading UI remains the same)
+      return Card(
+        margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 24.0),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      );
+    }
+
+    // Show empty state if no data
+    if (_categoryExpenses.isEmpty && _totalAmount == 0.0) {
+      // ... (Empty state UI remains the same)
+      return Card(
+        margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 24.0),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: SizedBox(
+            height: 100,
+            child: Center(
+              child: Text(
+                'No expenses recorded this month.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Build the Card UI with fetched data
+    return Card(
+      margin: const EdgeInsets.only(
+        left: 16.0,
+        right: 16.0,
+        bottom: 24.0,
+      ),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Expense Overview',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Display the correct, fetched total amount
+                Text(
+                  'RM ${_totalAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Spacer(),
+                // NOTE: This trend indicator is still static/mocked for now
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.trending_down,
+                        size: 14,
+                        color: Colors.red.shade700,
+                      ),
+                      Text(
+                        '+12% from last month',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Use the actual fetched category expenses to build the bars
+            ..._categoryExpenses.map(
+                  (exp) => ExpenseBar(
+                expense: exp,
+                totalAmount: _totalAmount,
+              ),
+            ).toList(),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -563,10 +777,10 @@ class AppDrawer extends StatelessWidget {
                               fontSize: 14,
                             ),
                           ),
-                          Text(
-                            'WXY 1234',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
+                          // Text(
+                          //   'WXY 1234',
+                          //   style: TextStyle(fontSize: 12, color: Colors.grey),
+                          // ),
                         ],
                       ),
                     ],
@@ -618,7 +832,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     user = _auth.currentUser;
 
     if (user != null) {
-      final doc = await _firestore.collection('users').doc(user!.uid).get();
+      // The doc is already passed in widget.userDoc, but fetching here for state management context.
+      // Keeping this simplified for the dashboard view.
+      // final doc = await _firestore.collection('users').doc(user!.uid).get();
 
       setState(() {
         loading = false;
@@ -627,10 +843,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSectionHeader(
-    String title, {
-    String? actionText,
-    VoidCallback? onActionTap,
-  }) {
+      String title, {
+        String? actionText,
+        VoidCallback? onActionTap,
+      }) {
     return Padding(
       padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
       child: Row(
@@ -677,26 +893,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ).openDrawer(), // This opens the drawer when the icon is clicked
           ),
         ),
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.directions_car, size: 14, color: Colors.black54),
-              SizedBox(width: 8),
-              Text(
-                'WXY 1234',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_drop_down, size: 14, color: Colors.black54),
-            ],
-          ),
-        ),
+        // title: Container(
+        //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        //   decoration: BoxDecoration(
+        //     color: Colors.blue.shade50,
+        //     borderRadius: BorderRadius.circular(10),
+        //   ),
+        //   child: const Row(
+        //     mainAxisSize: MainAxisSize.min,
+        //     // children: [
+        //     //   Icon(Icons.directions_car, size: 14, color: Colors.black54),
+        //     //   SizedBox(width: 8),
+        //     //   Text(
+        //     //     'WXY 1234',
+        //     //     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        //     //   ),
+        //     //   SizedBox(width: 8),
+        //     //   Icon(Icons.arrow_drop_down, size: 14, color: Colors.black54),
+        //     // ],
+        //   ),
+        // ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -839,85 +1055,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: _buildSectionHeader(
                   'This Month',
                   actionText: 'View Analytics >',
-                  onActionTap: () {},
+                  onActionTap: () {
+                    // Navigate to the ExpensesAnalyticsPage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ExpensesAnalyticsPage(userDoc: widget.userDoc),
+                      ),
+                    );
+                  },
                 ),
               ),
-              Card(
-                margin: const EdgeInsets.only(
-                  left: 16.0,
-                  right: 16.0,
-                  bottom: 24.0,
-                ),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Expense Overview',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            'RM 1,245',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.trending_down,
-                                  size: 14,
-                                  color: Colors.red.shade700,
-                                ), // Using trending_down to indicate "+12% from last month"
-                                Text(
-                                  '+12% from last month',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      ...expenses.map(
-                        (exp) => ExpenseBar(
-                          expense: exp,
-                          totalAmount: totalExpenseAmount,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+
+              // ⭐️ DYNAMIC EXPENSE OVERVIEW ⭐️
+              ThisMonthExpenseOverview(userDoc: widget.userDoc),
+
+              // Added some padding for the bottom of the scroll view
+              const SizedBox(height: 16.0),
             ]),
           ),
         ],

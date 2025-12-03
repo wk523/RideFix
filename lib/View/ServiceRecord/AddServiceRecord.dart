@@ -490,29 +490,39 @@ class _AddServiceRecordPageState extends State<AddServiceRecordPage> {
               .where((c) => c != ServiceCategory.none)
               .map(
                 (category) => InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedCategory = category;
-                      _extraFormData = {};
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(category.icon, color: Colors.blue),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(category.displayName, textAlign: TextAlign.center),
-                    ],
+              onTap: () {
+                setState(() {
+                  _selectedCategory = category;
+                  _extraFormData = {};
+                });
+                Navigator.pop(context);
+              },
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(category.icon, color: Colors.blue),
                   ),
-                ),
-              )
+                  const SizedBox(height: 4),
+                  // 💡 FIX: Set maxLines and overflow to clip/wrap the text
+                  Expanded( // ⬅️ Use Expanded to ensure the Column has flexible vertical space
+                    child: Text(
+                      category.displayName,
+                      textAlign: TextAlign.center,
+                      // Optional: reduce font size if needed
+                      style: const TextStyle(fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis, // Add ellipsis if it still overflows vertically
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
               .toList(),
         ),
       ),

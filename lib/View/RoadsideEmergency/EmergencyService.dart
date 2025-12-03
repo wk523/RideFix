@@ -399,12 +399,12 @@ class _EmergencyServicePageState extends State<EmergencyServicePage> {
                       controller.toggleFavorite(userId, service);
                     },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, color: Colors.blue),
-                    onPressed: () {
-                      // Show detailed info
-                    },
-                  ),
+                  // IconButton(
+                  //   icon: const Icon(Icons.info_outline, color: Colors.blue),
+                  //   onPressed: () {
+                  //     // Show detailed info
+                  //   },
+                  // ),
                 ],
               ),
             ],

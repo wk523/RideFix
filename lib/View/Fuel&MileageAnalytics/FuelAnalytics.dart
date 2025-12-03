@@ -913,7 +913,8 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
           height: 280,
           child: LineChart(
             LineChartData(
-              // ... (minX, maxX, minY, maxY remain the same) ...
+              minY: minY,
+              maxY: maxY,
               titlesData: FlTitlesData(
                 show: true,
                 topTitles: const AxisTitles(
