@@ -3,77 +3,103 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ridefix/model/maintenance_reminder_model.dart';
 import 'package:ridefix/services/notification_service.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 class MaintenanceReminderController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = "MaintenanceReminder";
   final NotificationService _notificationService = NotificationService();
 
+  MaintenanceReminderController() {
+    _initializeTimezones();
+  }
+
+  Future<void> _initializeTimezones() async {
+    tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Kuala_Lumpur'));
+  }
+
+  DateTime _convertMalaysiaToUtc(DateTime malaysiaTime) {
+    final location = tz.getLocation('Asia/Kuala_Lumpur');
+    return tz.TZDateTime.from(malaysiaTime, location).toUtc();
+  }
+
   Future<void> addReminder(MaintenanceReminderModel model) async {
     final docRef = _firestore.collection(_collection).doc();
-    await docRef.set(model.toMap());
+    
+    // Convert to UTC before saving
+    final utcDueTime = _convertMalaysiaToUtc(model.dueDateTime);
+    final reminderWithUtc = MaintenanceReminderModel(
+      userId: model.userId,
+      maintenanceType: model.maintenanceType,
+      dueDateTime: utcDueTime,
+      createdAt: DateTime.now().toUtc(), // Always use UTC for creation time
+      status: model.status,
+    );
+
+    await docRef.set(reminderWithUtc.toMap());
 
     await _notificationService.scheduleNotification(
       id: docRef.id.hashCode,
       title: "Maintenance Reminder",
       body: "Your ${model.maintenanceType} is due soon.",
-      scheduledTime: model.dueDateTime,
-      category: model.maintenanceType, // ✅ 添加 category 参数
+      scheduledTime: utcDueTime, // Use the converted UTC time
+      category: model.maintenanceType,
       reminderId: docRef.id,
     );
   }
 
   Future<void> updateReminder(String id, MaintenanceReminderModel model) async {
-    // 🔥 自动检查是否 expired
+    final utcDueTime = _convertMalaysiaToUtc(model.dueDateTime);
+    
     String updatedStatus =
-    model.dueDateTime.isBefore(DateTime.now()) ? "expired" : model.status;
+    utcDueTime.isBefore(DateTime.now().toUtc()) ? "expired" : model.status;
 
     await _firestore.collection(_collection).doc(id).update({
       "maintenanceType": model.maintenanceType,
-      "dueDateTime": Timestamp.fromDate(model.dueDateTime),
-      "status": updatedStatus, // 🔥 自动更新 status
-      "createdAt": Timestamp.fromDate(model.createdAt),
+      "dueDateTime": Timestamp.fromDate(utcDueTime),
+      "status": updatedStatus,
     });
 
-    // 🔥 取消旧通知
     await _notificationService.cancelNotification(id.hashCode);
 
-    // 🔥 expired 就不要再创建新通知
     if (updatedStatus != "expired") {
       await _notificationService.scheduleNotification(
         id: id.hashCode,
         title: "Updated Reminder",
         body: "Your ${model.maintenanceType} reminder has been updated.",
-        scheduledTime: model.dueDateTime,
+        scheduledTime: utcDueTime,
         category: model.maintenanceType,
         reminderId: id,
       );
     }
   }
 
-
-  /// 🔥 DELETE REMINDER
   Future<void> deleteReminder(String reminderId) async {
     await _firestore.collection(_collection).doc(reminderId).delete();
     await _notificationService.cancelNotification(reminderId.hashCode);
   }
 
-  /// 🔥 Confirm + Delete (Handled in controller)
   Future<bool> confirmAndDeleteReminder(BuildContext context, String reminderId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) {
+      barrierDismissible: false, // <- 很重要，避免点背景关闭
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text("Confirm Delete"),
           content: const Text("Are you sure you want to delete this reminder?"),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text("No"),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Yes", style: TextStyle(color: Colors.red)),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                "Yes",
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );
@@ -84,10 +110,11 @@ class MaintenanceReminderController {
       await deleteReminder(reminderId);
       return true;
     }
+
     return false;
   }
 
-  /// 🔥 GET ALL USER REMINDERS
+
   Stream<List<MaintenanceReminderModel>> getUserReminders() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();
@@ -107,7 +134,6 @@ class MaintenanceReminderController {
     });
   }
 
-  /// 🔥 GET ONLY ACTIVE REMINDERS
   Stream<List<MaintenanceReminderModel>> getActiveReminders() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();

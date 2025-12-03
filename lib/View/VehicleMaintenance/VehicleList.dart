@@ -1,10 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceDatabase.dart';
-import 'package:ridefix/VehicleMaintenance/VehicleRegistration.dart';
+import 'package:ridefix/Controller/Vehicle/VehicleMaintenanceController.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleDetails.dart';
+import 'package:ridefix/View/VehicleMaintenance/VehicleRegistration.dart';
+
+import '../../Model/vehicle_maintenance_model.dart';
 
 // --- Vehicle List Page Widget (Now Stateful) ---
 class VehicleListPage extends StatefulWidget {
-  const VehicleListPage({super.key});
+  final DocumentSnapshot userDoc;
+
+  const VehicleListPage({super.key, required this.userDoc});
 
   @override
   State<VehicleListPage> createState() => _VehicleListPageState();
@@ -130,7 +137,8 @@ class _VehicleListPageState extends State<VehicleListPage> {
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const VehicleRegistrationPage(),
+              builder: (context) =>
+                  VehicleRegistrationPage(userDoc: widget.userDoc),
             ),
           );
 
@@ -140,6 +148,10 @@ class _VehicleListPageState extends State<VehicleListPage> {
       ),
     );
   }
+}
+
+extension on VehicleDataService {
+  Future<Object?>? get initializationComplete => null;
 }
 
 // --- Helper Widget for the Vehicle Card UI ---
@@ -152,7 +164,19 @@ class VehicleListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        print('Tapped on ${vehicle.model}');
+        // ✅ Navigate to Vehicle Details Page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleDetailsPage(
+              vehicleId: vehicle.vehicleId,
+              uid: FirebaseAuth
+                  .instance
+                  .currentUser!
+                  .uid, // ✅ This must not be empty
+            ),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(12.0),
@@ -170,21 +194,34 @@ class VehicleListCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Vehicle Image (Left side)
+            // ✅ Vehicle Image (Fix: use Image.network instead of Image.asset)
             ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: Image.asset(
-                vehicle.imageUrl,
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 80,
-                  height: 80,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.directions_car, color: Colors.grey),
-                ),
-              ),
+              child: vehicle.imageUrl.isNotEmpty
+                  ? Image.network(
+                      vehicle.imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.grey[300],
+                        child: const Icon(
+                          Icons.directions_car,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: Colors.grey,
+                      ),
+                    ),
             ),
             const SizedBox(width: 15.0),
 
@@ -193,15 +230,27 @@ class VehicleListCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    vehicle.model,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        vehicle.brand,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 2.0),
+                      Text(
+                        vehicle.model,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8.0),
 
+                  const SizedBox(height: 8.0),
                   Row(
                     children: [
                       const Icon(Icons.numbers, size: 16, color: Colors.blue),

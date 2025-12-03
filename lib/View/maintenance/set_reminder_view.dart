@@ -26,7 +26,7 @@ class _SetReminderViewState extends State<SetReminderView> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: now,
+      initialDate: _selectedDate ?? now,
       firstDate: now,
       lastDate: DateTime(2100),
     );
@@ -38,31 +38,28 @@ class _SetReminderViewState extends State<SetReminderView> {
     final now = TimeOfDay.now();
     final picked = await showTimePicker(
       context: context,
-      initialTime: now,
+      initialTime: _selectedTime ?? now,
     );
 
     if (picked != null) {
       if (_selectedDate != null) {
         final selectedDateTime = DateTime(
-          _selectedDate!.year,
-          _selectedDate!.month,
-          _selectedDate!.day,
-          picked.hour,
-          picked.minute,
-        );
+          _selectedDate!.year, _selectedDate!.month, _selectedDate!.day, picked.hour, picked.minute);
+        final nowDateTime = DateTime.now();
 
-        // 检查时间（Malaysia 时间）
-        final nowMalaysia = DateTime.now().toUtc().add(const Duration(hours: 8));
-        final malaysiaDt = selectedDateTime.add(const Duration(hours: 8));
+        // Truncate for minute-level comparison
+        final truncatedSelected = DateTime(selectedDateTime.year, selectedDateTime.month, selectedDateTime.day, selectedDateTime.hour, selectedDateTime.minute);
+        final truncatedNow = DateTime(nowDateTime.year, nowDateTime.month, nowDateTime.day, nowDateTime.hour, nowDateTime.minute);
 
-        if (malaysiaDt.isBefore(nowMalaysia)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cannot select a past time')),
-          );
+        if (truncatedSelected.isBefore(truncatedNow)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Cannot select a past time')),
+            );
+          }
           return;
         }
       }
-
       setState(() => _selectedTime = picked);
     }
   }
@@ -78,48 +75,31 @@ class _SetReminderViewState extends State<SetReminderView> {
       return;
     }
 
-    // 用户选择的时间（Malaysia UTC+8）
-    final selectedHour = _selectedTime!.hour;
-    final selectedMinute = _selectedTime!.minute;
-
-    // 创建 Malaysia 时间
-    final malaysiaDt = DateTime(
+    // Combine date and time to create the local Malaysia DateTime
+    final malaysiaDueDateTime = DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
       _selectedDate!.day,
-      selectedHour,
-      selectedMinute,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
     );
-
-
-    final utcDateTime = malaysiaDt.subtract(const Duration(hours: 8));
-
-    ;
-
-    // 再次检查时间
-    final nowMalaysia = DateTime.now().toUtc().add(const Duration(hours: 8));
-    if (malaysiaDt.isBefore(nowMalaysia)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot select a past time')),
-      );
-      return;
-    }
 
     final reminder = MaintenanceReminderModel(
       userId: user.uid,
       maintenanceType: _selectedCategory!,
-      dueDateTime: utcDateTime,
-      createdAt: DateTime.now().toUtc(),
+      dueDateTime: malaysiaDueDateTime, // Pass the local time directly to the controller
+      createdAt: DateTime.now(), // Controller will handle UTC conversion
       status: 'active',
     );
 
     await _controller.addReminder(reminder);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminder saved successfully!')),
-    );
-
-    Navigator.pop(context);
+    if(mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reminder saved successfully!')),
+      );
+      Navigator.pop(context);
+    }
   }
 
   @override
