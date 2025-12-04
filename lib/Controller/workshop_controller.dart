@@ -77,8 +77,7 @@ class WorkshopController extends ChangeNotifier {
       }
 
       _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+          desiredAccuracy: LocationAccuracy.high);
       notifyListeners();
     } catch (e) {
       debugPrint("Error getting location: $e");
@@ -102,8 +101,7 @@ class WorkshopController extends ChangeNotifier {
       }
 
       // 使用 Autocomplete API 搜索工坊和汽修相关的地点
-      final url =
-          "https://maps.googleapis.com/maps/api/place/autocomplete/json?"
+      final url = "https://maps.googleapis.com/maps/api/place/autocomplete/json?"
           "input=$input"
           "&location=${_currentPosition!.latitude},${_currentPosition!.longitude}"
           "&radius=50000"
@@ -117,18 +115,14 @@ class WorkshopController extends ChangeNotifier {
       final data = json.decode(response.body);
 
       if (data["status"] == "OK" && data["predictions"] != null) {
-        _predictions = (data["predictions"] as List)
-            .map((p) {
-              return SimplePrediction(
-                placeId: p["place_id"] ?? '',
-                description: p["description"] ?? '',
-                mainText: p["structured_formatting"]?["main_text"] ?? '',
-                secondaryText:
-                    p["structured_formatting"]?["secondary_text"] ?? '',
-              );
-            })
-            .take(5)
-            .toList(); // 只显示前5个结果
+        _predictions = (data["predictions"] as List).map((p) {
+          return SimplePrediction(
+            placeId: p["place_id"] ?? '',
+            description: p["description"] ?? '',
+            mainText: p["structured_formatting"]?["main_text"] ?? '',
+            secondaryText: p["structured_formatting"]?["secondary_text"] ?? '',
+          );
+        }).take(5).toList(); // 只显示前5个结果
 
         debugPrint("Found ${_predictions.length} suggestions");
       } else {
@@ -154,8 +148,7 @@ class WorkshopController extends ChangeNotifier {
 
     try {
       // 获取选中地点的详细信息
-      final url =
-          "https://maps.googleapis.com/maps/api/place/details/json?"
+      final url = "https://maps.googleapis.com/maps/api/place/details/json?"
           "place_id=$placeId"
           "&fields=geometry,name,formatted_address,types"
           "&key=$_apiKey";
@@ -181,14 +174,11 @@ class WorkshopController extends ChangeNotifier {
           );
 
           // 检查是否是工坊类型的地点
-          bool isWorkshop =
-              types?.any(
-                (type) =>
-                    type.toString().contains('car_repair') ||
-                    type.toString().contains('car_dealer') ||
-                    type.toString().contains('car_wash'),
-              ) ??
-              false;
+          bool isWorkshop = types?.any((type) =>
+          type.toString().contains('car_repair') ||
+              type.toString().contains('car_dealer') ||
+              type.toString().contains('car_wash')
+          ) ?? false;
 
           if (isWorkshop) {
             // 如果选中的就是工坊，直接添加到列表
@@ -199,7 +189,7 @@ class WorkshopController extends ChangeNotifier {
                 address: result["formatted_address"] ?? "Unknown Address",
                 rating: (result["rating"] ?? 0.0).toDouble(),
                 location: WorkshopLocation(lat: lat, lng: lng),
-              ),
+              )
             ];
             debugPrint("Added workshop directly");
           } else {
@@ -236,17 +226,14 @@ class WorkshopController extends ChangeNotifier {
         return;
       }
 
-      final url =
-          "https://maps.googleapis.com/maps/api/place/nearbysearch/json?"
+      final url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?"
           "location=$targetLat,$targetLng"
           "&radius=10000"
           "&keyword=$keyword"
           "&type=car_repair"
           "&key=$_apiKey";
 
-      debugPrint(
-        "Searching workshops at: $targetLat, $targetLng with keyword: $keyword",
-      );
+      debugPrint("Searching workshops at: $targetLat, $targetLng with keyword: $keyword");
 
       final response = await http.get(Uri.parse(Uri.encodeFull(url)));
       final data = json.decode(response.body);
@@ -321,67 +308,71 @@ class WorkshopController extends ChangeNotifier {
         .collection('reviews')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => AppReview.Review.fromFirestore(doc))
-              .toList(),
-        );
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => AppReview.Review.fromFirestore(doc)).toList());
   }
-  // 在你的 WorkshopController 类中添加：
+// 在你的 WorkshopController 类中添加：
 
-  // 更新评论
+// 更新评论
   Future<void> updateReview(
-    BuildContext context, {
-    required String reviewId,
-    required String placeId,
-    required String workshopName,
-    required double rating,
-    required String comment,
-  }) async {
+      BuildContext context, {
+        required String reviewId,
+        required String placeId,
+        required String workshopName,
+        required double rating,
+        required String comment,
+      }) async {
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Please login first')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login first')),
+        );
         return;
       }
 
       await FirebaseFirestore.instance
+          .collection('workshop_reviews')
+          .doc(placeId)
           .collection('reviews')
           .doc(reviewId)
           .update({
-            'rating': rating,
-            'comment': comment,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+        'rating': rating,
+        'comment': comment,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Review updated successfully!')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error updating review: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating review: $e')),
+      );
     }
   }
 
-  // 删除评论
+
+// 删除评论
   Future<void> deleteReview(
-    BuildContext context, {
-    required String reviewId,
-    required String placeId,
-  }) async {
+      BuildContext context, {
+        required String reviewId,
+        required String placeId,
+      }) async {
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Please login first')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login first')),
+        );
         return;
       }
 
       await FirebaseFirestore.instance
+          .collection('workshop_reviews')
+          .doc(placeId)
           .collection('reviews')
           .doc(reviewId)
           .delete();
@@ -390,26 +381,24 @@ class WorkshopController extends ChangeNotifier {
         const SnackBar(content: Text('Review deleted successfully!')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error deleting review: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting review: $e')),
+      );
     }
   }
 
   Future<void> addReview(
-    BuildContext context, {
-    required String placeId,
-    required String workshopName,
-    required double rating,
-    required String comment,
-  }) async {
+      BuildContext context, {
+        required String placeId,
+        required String workshopName,
+        required double rating,
+        required String comment,
+      }) async {
     final user = _auth.currentUser;
     if (user == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You must be logged in to post a review.'),
-          ),
+          const SnackBar(content: Text('You must be logged in to post a review.')),
         );
       }
       return;
