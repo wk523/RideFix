@@ -164,6 +164,12 @@ class VehicleListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
+        if (vehicle.imageUrl.isNotEmpty) {
+          precacheImage(
+            NetworkImage(vehicle.imageUrl),
+            context,
+          );
+        }
         // ✅ Navigate to Vehicle Details Page
         Navigator.push(
           context,

@@ -941,7 +941,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     Text(
-                      'Welcome back! Here\'s your vehicle overview',
+                      'Welcome back to RideFix!',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade600,
