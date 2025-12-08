@@ -1044,7 +1044,7 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
         ),
 
         // 5. Add a simple legend (below the chart)
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         // FIX: Ensure _buildLegend uses a layout that won't overflow
         _buildLegend(vehicleEntriesMap.keys.toList()),
       ],
