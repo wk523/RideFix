@@ -1,35 +1,51 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:ridefix/services/notification_service.dart';
+import 'package:provider/provider.dart';
+import 'package:ridefix/Services/notification_service.dart';
+import 'package:ridefix/View/auth/register_screen.dart';
 
-// Import your app screens
+// Import RideFX onboarding and login pages
+import 'Controller/EmergencyService/EmergencyServiceController.dart';
 import 'View/auth/welcome_screen.dart';
-import 'View/auth/login_screen.dart';
-import 'View/auth/register_screen.dart';
-import 'View/profile/profile_screen.dart';
-import 'VehicleMaintenance/VehicleList.dart';
-import 'VehicleMaintenance/VehicleRegistration.dart';
-import 'VehicleMaintenance/UpdateVehicle.dart';
-import 'View/troubleshoot/troubleshooting_page.dart';
-import 'view/troubleshoot/qna_list_view.dart';
-import 'View/maintenance/maintenance_main_view.dart';
+import 'package:ridefix/view/auth/login_screen.dart';
+import 'package:ridefix/view/profile/profile_screen.dart';
+
+// Import vehicle maintenance modules
+
+//Import troubleshooting
+import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
+import 'package:ridefix/view/troubleshoot/qna_list_view.dart';
+
+//Import Maintenance Reminder
+import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // 1️⃣ Initialize Firebase first
+    // Initialize Firebase FIRST (must)
     await Firebase.initializeApp();
     print('✅ Firebase initialized successfully');
 
-    // 2️⃣ Initialize NotificationService AFTER Firebase
+    // Initialize notification AFTER Firebase
     await NotificationService().initialize();
-    print('✅ NotificationService initialized successfully');
+    print('✅ Notification service initialized successfully');
   } catch (e) {
     print('❌ Error during initialization: $e');
   }
 
-  runApp(const MyApp());
+  runApp(
+    // WRAP the entire application with the required providers
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => EmergencyServiceController(), // ⬅️ PROVIDE IT HERE
+        ),
+        // Add any other top-level providers here (e.g., AuthController)
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -52,14 +68,13 @@ class MyApp extends StatelessWidget {
       home: const WelcomeScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/vehicleList': (context) => VehicleListPage(),
-        '/vehicleRegister': (context) => VehicleRegistrationPage(),
-        '/updateVehicle': (context) => UpdateVehiclePage(),
+        // '/home': (context) => const HomePage(),
         '/profile': (context) => const ProfileScreen(),
         '/guide': (context) => const TroubleshootingPage(),
+        '/register': (context) => const RegisterScreen(),
         '/qnaList': (context) => QnaListView(),
         '/maintenance': (context) => MaintenanceMainView(),
+
       },
     );
   }

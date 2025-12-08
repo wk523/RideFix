@@ -28,13 +28,13 @@ class MaintenanceReminderController {
   Future<void> addReminder(MaintenanceReminderModel model) async {
     final docRef = _firestore.collection(_collection).doc();
     
-    // Convert to UTC before saving
     final utcDueTime = _convertMalaysiaToUtc(model.dueDateTime);
     final reminderWithUtc = MaintenanceReminderModel(
       userId: model.userId,
+      vehicleId: model.vehicleId, // <-- Pass vehicleId
       maintenanceType: model.maintenanceType,
       dueDateTime: utcDueTime,
-      createdAt: DateTime.now().toUtc(), // Always use UTC for creation time
+      createdAt: DateTime.now().toUtc(),
       status: model.status,
     );
 
@@ -44,7 +44,7 @@ class MaintenanceReminderController {
       id: docRef.id.hashCode,
       title: "Maintenance Reminder",
       body: "Your ${model.maintenanceType} is due soon.",
-      scheduledTime: utcDueTime, // Use the converted UTC time
+      scheduledTime: utcDueTime,
       category: model.maintenanceType,
       reminderId: docRef.id,
     );
@@ -60,6 +60,7 @@ class MaintenanceReminderController {
       "maintenanceType": model.maintenanceType,
       "dueDateTime": Timestamp.fromDate(utcDueTime),
       "status": updatedStatus,
+      "vehicleId": model.vehicleId, // <-- Add vehicleId to the update
     });
 
     await _notificationService.cancelNotification(id.hashCode);
@@ -84,22 +85,18 @@ class MaintenanceReminderController {
   Future<bool> confirmAndDeleteReminder(BuildContext context, String reminderId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // <- 很重要，避免点背景关闭
-      builder: (BuildContext dialogContext) {
+      builder: (_) {
         return AlertDialog(
           title: const Text("Confirm Delete"),
           content: const Text("Are you sure you want to delete this reminder?"),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text("No"),
             ),
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text(
-                "Yes",
-                style: TextStyle(color: Colors.red),
-              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Yes", style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -107,13 +104,25 @@ class MaintenanceReminderController {
     );
 
     if (confirm == true) {
-      await deleteReminder(reminderId);
-      return true;
+      try {
+        await deleteReminder(reminderId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Reminder deleted successfully.'), backgroundColor: Colors.green),
+          );
+        }
+        return true;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting reminder: $e'), backgroundColor: Colors.red),
+          );
+        }
+        return false;
+      }
     }
-
     return false;
   }
-
 
   Stream<List<MaintenanceReminderModel>> getUserReminders() {
     final uid = FirebaseAuth.instance.currentUser?.uid;

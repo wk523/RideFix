@@ -267,6 +267,41 @@ class ParkingController extends ChangeNotifier {
       );
     }
   }
+  Future<bool> confirmAndDeleteParking(
+      BuildContext context,
+      String parkingId,
+      ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // 防止点背景关闭
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Remove Parking Reminder"),
+          content: const Text("Are you sure you want to remove this reminder?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                "Remove",
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await deleteParking(parkingId); // <-- 直接调用你的删除函数
+      return true;
+    }
+
+    return false;
+  }
 
   /// ----------------------------------------------------------
   /// Public method to manually check & expire parkings

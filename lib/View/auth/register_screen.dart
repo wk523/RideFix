@@ -151,6 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
+                    foregroundColor: Colors.black,
                     padding:
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 60),
                     shape: RoundedRectangleBorder(

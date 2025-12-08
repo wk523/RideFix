@@ -322,6 +322,7 @@ class WorkshopController extends ChangeNotifier {
         required double rating,
         required String comment,
       }) async {
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -332,6 +333,8 @@ class WorkshopController extends ChangeNotifier {
       }
 
       await FirebaseFirestore.instance
+          .collection('workshop_reviews')
+          .doc(placeId)
           .collection('reviews')
           .doc(reviewId)
           .update({
@@ -350,12 +353,14 @@ class WorkshopController extends ChangeNotifier {
     }
   }
 
+
 // 删除评论
   Future<void> deleteReview(
       BuildContext context, {
         required String reviewId,
         required String placeId,
       }) async {
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -366,6 +371,8 @@ class WorkshopController extends ChangeNotifier {
       }
 
       await FirebaseFirestore.instance
+          .collection('workshop_reviews')
+          .doc(placeId)
           .collection('reviews')
           .doc(reviewId)
           .delete();
@@ -379,6 +386,7 @@ class WorkshopController extends ChangeNotifier {
       );
     }
   }
+
   Future<void> addReview(
       BuildContext context, {
         required String placeId,

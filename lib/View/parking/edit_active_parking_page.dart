@@ -63,28 +63,57 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
   }
 
   /// Delete popup confirmation
-  void _confirmDelete(BuildContext context, Parking parking) {
-    showDialog(
+  /// Delete popup confirmation (safe / prevents multiple taps)
+  Future<bool> _confirmDelete(BuildContext context, Parking parking) async {
+    bool isProcessing = false;
+
+    final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Remove Parking Reminder"),
-        content: const Text("Are you sure you want to remove this reminder?"),
-        actions: [
-          TextButton(
-            child: const Text("Cancel"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            child: const Text("Remove"),
-            onPressed: () async {
-              await _controller.deleteParking(parking.id!);
-              if (mounted) Navigator.pop(context);
-            },
-          )
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Remove Parking Reminder"),
+              content: const Text("Are you sure you want to remove this reminder?"),
+              actions: [
+                TextButton(
+                  onPressed: isProcessing
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: isProcessing
+                      ? null
+                      : () async {
+                    setState(() => isProcessing = true);
+
+                    await _controller.deleteParking(parking.id!);
+
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop(true);
+                    }
+                  },
+                  child: isProcessing
+                      ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : const Text("Remove"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+
+    return result == true;
   }
+
+
 
   /// View detail popup using ParkingDetailsCard
   void _showDetailCard(Parking parking) {

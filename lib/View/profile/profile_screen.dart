@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:ridefix/view/auth/welcome_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -240,11 +242,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("Cancel",style: TextStyle(color: Colors.black),
           )),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text("Confirm",style: TextStyle(color: Colors.black),
-          ),
-          )],
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                    (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.black, // <-- Text color
+            ),
+            child: const Text("Logout"),
+          )
+        ],
       ),
     );
 

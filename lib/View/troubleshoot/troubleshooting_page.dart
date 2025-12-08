@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ridefix/controller/trouble_guide_controller.dart';
 import 'package:ridefix/model/trouble_guide_item.dart';
 import 'package:ridefix/View/troubleshoot/video_player_page.dart';
+import 'package:ridefix/View/troubleshoot/qna_list_view.dart';
 
 class TroubleshootingPage extends StatefulWidget {
   const TroubleshootingPage({super.key});
@@ -41,14 +42,34 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "CATEGORY",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                letterSpacing: 1.2,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "CATEGORY",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+
+                // ➕ 新增 QnA 按钮
+                IconButton(
+                  icon: const Icon(Icons.quiz, color: Colors.blue),
+                  tooltip: "Go to QnA",
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>  QnaListView(), // <-- 你的 QnA 页面
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
+
             const SizedBox(height: 10),
 
 
