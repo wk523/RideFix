@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:ridefix/view/auth/welcome_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -55,9 +56,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _isEditing = false);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
     }
   }
 
@@ -74,7 +75,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white, // white background
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text(
             "Change Password",
             style: TextStyle(
@@ -91,7 +94,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: InputDecoration(
                   labelText: "Old Password",
                   labelStyle: const TextStyle(color: Colors.black),
-                  prefixIcon: const Icon(Icons.lock_outline, color: Colors.blue),
+                  prefixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: Colors.blue,
+                  ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -151,10 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              child: const Text(
-                "Cancel",
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
               onPressed: () => Navigator.pop(context),
             ),
             ElevatedButton(
@@ -177,7 +180,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 if (oldPass == newPass) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("New password must be different from old password")),
+                    const SnackBar(
+                      content: Text(
+                        "New password must be different from old password",
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -199,7 +206,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Password updated successfully!")),
+                    const SnackBar(
+                      content: Text("Password updated successfully!"),
+                    ),
                   );
                 } catch (e) {
                   String message = "Something went wrong";
@@ -208,9 +217,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   } else if (e.toString().contains("weak-password")) {
                     message = "Password should be at least 6 characters";
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
                 }
               },
             ),
@@ -219,7 +228,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
   }
-
 
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
@@ -231,20 +239,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: const [
             Icon(Icons.logout, size: 50, color: Colors.blue),
             SizedBox(height: 8),
-            Text("Confirm to log out?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black),
-            )],
+            Text(
+              "Confirm to log out?",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel",style: TextStyle(color: Colors.black),
-          )),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text("Confirm",style: TextStyle(color: Colors.black),
+            child: const Text("Cancel", style: TextStyle(color: Colors.black)),
           ),
-          )],
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.black, // <-- Text color
+            ),
+            child: const Text("Logout"),
+          ),
+        ],
       ),
     );
 
@@ -257,9 +277,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -329,21 +347,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _updateProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 40,
+                  ),
                 ),
-                child: const Text('Save Changes',style: TextStyle(color: Colors.black),
-                )),
+                child: const Text(
+                  'Save Changes',
+                  style: TextStyle(color: Colors.black),
+                ),
+              ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _changePassword,
-              icon: const Icon(Icons.lock_outline, color: Colors.black), // black icon
+              icon: const Icon(
+                Icons.lock_outline,
+                color: Colors.black,
+              ), // black icon
               label: const Text(
                 "Change Password",
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600), // black text
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                ), // black text
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 40,
+                ),
               ),
             ),
 
@@ -354,11 +387,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: const Icon(Icons.logout, color: Colors.black), // black icon
               label: const Text(
                 "Log Out",
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600), // black text
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                ), // black text
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 60),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 60,
+                ),
               ),
             ),
           ],

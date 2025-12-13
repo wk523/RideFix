@@ -13,7 +13,7 @@ class ParkingController extends ChangeNotifier {
 
   /// 🔔 Local Notification Plugin
   final FlutterLocalNotificationsPlugin notifications =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   GoogleMapController? _mapController;
   GoogleMapController? get mapController => _mapController;
@@ -188,9 +188,11 @@ class ParkingController extends ChangeNotifier {
         .where('userId', isEqualTo: uid)
         .orderBy('expiredTime', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-      return Parking.fromFirestore(doc);
-    }).toList());
+        .map(
+          (snap) => snap.docs.map((doc) {
+            return Parking.fromFirestore(doc);
+          }).toList(),
+        );
   }
 
   /// ----------------------------------------------------------
@@ -250,7 +252,7 @@ class ParkingController extends ChangeNotifier {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
 
     final tenMinBefore = tzTime.subtract(const Duration(minutes: 10));
@@ -263,9 +265,42 @@ class ParkingController extends ChangeNotifier {
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
     }
+  }
+
+  Future<bool> confirmAndDeleteParking(
+    BuildContext context,
+    String parkingId,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // 防止点背景关闭
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Remove Parking Reminder"),
+          content: const Text("Are you sure you want to remove this reminder?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text("Remove", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await deleteParking(parkingId); // <-- 直接调用你的删除函数
+      return true;
+    }
+
+    return false;
   }
 
   /// ----------------------------------------------------------

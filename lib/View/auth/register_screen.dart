@@ -11,7 +11,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final nameController = TextEditingController();            // <- 新增
+  final nameController = TextEditingController(); // <- 新增
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -30,18 +30,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await _authController.registerUser(
         emailController.text.trim(),
         passwordController.text.trim(),
-        nameController.text.trim(),            // <- 新增传入 name
+        nameController.text.trim(), // <- 新增传入 name
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration successful!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Registration successful!')));
 
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -132,8 +132,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   onSuffixIconTap: () {
-                    setState(() =>
-                    _obscureConfirmPassword = !_obscureConfirmPassword);
+                    setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                    );
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -151,23 +152,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
-                    padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 60),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 60,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                      : const Text("Register",
-                      style: TextStyle(fontSize: 16)),
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text("Register", style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 16),
 

@@ -63,27 +63,56 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
   }
 
   /// Delete popup confirmation
-  void _confirmDelete(BuildContext context, Parking parking) {
-    showDialog(
+  /// Delete popup confirmation (safe / prevents multiple taps)
+  Future<bool> _confirmDelete(BuildContext context, Parking parking) async {
+    bool isProcessing = false;
+
+    final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Remove Parking Reminder"),
-        content: const Text("Are you sure you want to remove this reminder?"),
-        actions: [
-          TextButton(
-            child: const Text("Cancel"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            child: const Text("Remove"),
-            onPressed: () async {
-              await _controller.deleteParking(parking.id!);
-              if (mounted) Navigator.pop(context);
-            },
-          )
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Remove Parking Reminder"),
+              content: const Text(
+                "Are you sure you want to remove this reminder?",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isProcessing
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: isProcessing
+                      ? null
+                      : () async {
+                          setState(() => isProcessing = true);
+
+                          await _controller.deleteParking(parking.id!);
+
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop(true);
+                          }
+                        },
+                  child: isProcessing
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text("Remove"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+
+    return result == true;
   }
 
   /// View detail popup using ParkingDetailsCard
@@ -117,9 +146,7 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
 
           final list = snapshot.data!;
           if (list.isEmpty) {
-            return const Center(
-              child: Text("No parking reminders."),
-            );
+            return const Center(child: Text("No parking reminders."));
           }
 
           return ListView.builder(
@@ -129,13 +156,15 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
               final parking = list[index];
 
               final malaysiaTime = _toMalaysia(parking.expiredTimeUtc);
-              final isExpired =
-              parking.expiredTimeUtc.isBefore(DateTime.now().toUtc());
+              final isExpired = parking.expiredTimeUtc.isBefore(
+                DateTime.now().toUtc(),
+              );
               final color = _countdownColor(parking.expiredTimeUtc);
 
               return Card(
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 elevation: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 child: Padding(
@@ -148,13 +177,18 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
                         leading: CircleAvatar(
                           radius: 26,
                           backgroundColor: color.withOpacity(0.2),
-                          child: Icon(Icons.local_parking,
-                              color: color, size: 28),
+                          child: Icon(
+                            Icons.local_parking,
+                            color: color,
+                            size: 28,
+                          ),
                         ),
                         title: Text(
                           "Parking: ${parking.parkingFloor}/${parking.lotNum}",
                           style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         subtitle: Text(
                           "Expire: ${DateFormat('yyyy-MM-dd HH:mm').format(malaysiaTime)} (MYT)",
@@ -167,7 +201,9 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
                       // Countdown badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: color.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(10),
@@ -213,22 +249,23 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
                               onPressed: isExpired
                                   ? null
                                   : () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        EditParkingFormPage(
-                                            parking: parking),
-                                  ),
-                                );
-                                if (mounted) setState(() {});
-                              },
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => EditParkingFormPage(
+                                            parking: parking,
+                                          ),
+                                        ),
+                                      );
+                                      if (mounted) setState(() {});
+                                    },
                               icon: const Icon(Icons.edit),
                               label: const Text("Edit"),
                               style: ElevatedButton.styleFrom(
                                 foregroundColor: Colors.black,
-                                backgroundColor:
-                                isExpired ? Colors.grey : Colors.blueAccent,
+                                backgroundColor: isExpired
+                                    ? Colors.grey
+                                    : Colors.blueAccent,
                                 minimumSize: const Size(double.infinity, 48),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
@@ -237,7 +274,7 @@ class _EditActiveParkingPageState extends State<EditActiveParkingPage> {
                             ),
                           ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),

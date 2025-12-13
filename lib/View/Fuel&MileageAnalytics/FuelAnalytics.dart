@@ -520,17 +520,16 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
   }
 
   // -----------------------------------------------------------------------
-
   Future<void> _showVehicleFilterDialog() async {
     final allVehicleIds = _vehicleNames.keys
         .toSet(); // Set containing all vehicle IDs
 
     // 🔑 MODIFICATION 1: Initialize tempSelected to contain ALL vehicle IDs
-    // This makes the dialog open with all vehicles selected.
     Set<String> tempSelected = Set.from(allVehicleIds);
 
     await showModalBottomSheet(
       context: context,
+      // Keep isScrollControlled: true to handle keyboard/small screens gracefully
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -539,6 +538,7 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Adjust bottom padding for keyboard presence
             final bottomPadding = MediaQuery.of(context).viewInsets.bottom + 16;
 
             return Padding(
@@ -549,6 +549,7 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
                 bottom: bottomPadding,
               ),
               child: Column(
+                // ⭐️ KEY FIX: Keep MainAxisSize.min ⭐️
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -587,7 +588,6 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
                     title: Text(
                       tempSelected.length == allVehicleIds.length
                           ? "Deselect All"
-                          // Changed label here as well, since initial state is Select All
                           : "Select All",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -608,37 +608,39 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
                   const Divider(height: 1),
 
                   // List of vehicles using CheckboxListTile
-                  // Note: Consider wrapping this section in a Scrollable widget if the list is long
-                  // to avoid issues when the keyboard is open or if the screen is small.
-                  Expanded(
-                    // Use Expanded to give the list flexible height
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: _allVehicles.map((vehicle) {
-                          return CheckboxListTile(
-                            title: Text(
-                              _vehicleNames[vehicle.vehicleId] ??
-                                  'Unknown Vehicle',
-                            ),
-                            value: tempSelected.contains(vehicle.vehicleId),
-                            onChanged: (bool? newValue) {
-                              setModalState(() {
-                                if (newValue == true) {
-                                  tempSelected.add(vehicle.vehicleId);
-                                } else {
-                                  tempSelected.remove(vehicle.vehicleId);
-                                }
-                              });
-                            },
-                            activeColor: Colors.blue,
-                            contentPadding: EdgeInsets.zero,
-                          );
-                        }).toList(),
-                      ),
+                  // ⭐️ KEY FIX: Remove the Expanded widget ⭐️
+                  // We rely solely on SingleChildScrollView + MainAxisSize.min
+                  // to size the list to its content, but allow scrolling if needed.
+                  SingleChildScrollView(
+                    // 💡 OPTIMIZATION: Optionally constrain the max height of this list
+                    // if you have many vehicles, to prevent it from consuming the entire screen.
+                    // For now, relying on MainAxisSize.min.
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: _allVehicles.map((vehicle) {
+                        return CheckboxListTile(
+                          title: Text(
+                            _vehicleNames[vehicle.vehicleId] ?? 'Unknown Vehicle',
+                          ),
+                          value: tempSelected.contains(vehicle.vehicleId),
+                          onChanged: (bool? newValue) {
+                            setModalState(() {
+                              if (newValue == true) {
+                                tempSelected.add(vehicle.vehicleId);
+                              } else {
+                                tempSelected.remove(vehicle.vehicleId);
+                              }
+                            });
+                          },
+                          activeColor: Colors.blue,
+                          contentPadding: EdgeInsets.zero,
+                        );
+                      }).toList(),
                     ),
                   ),
 
                   const SizedBox(height: 10), // Reduced space above buttons
+
                   // APPLY/RESET BUTTONS
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -646,7 +648,6 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
                       TextButton.icon(
                         icon: const Icon(Icons.refresh, color: Colors.red),
                         label: const Text(
-                          // Changed label back to "Reset"
                           "Reset",
                           style: TextStyle(
                             color: Colors.red,
@@ -654,7 +655,6 @@ class _FuelAnalyticsPageState extends State<FuelAnalyticsPage> {
                           ),
                         ),
                         onPressed: () {
-                          // 🔑 MODIFICATION 2: Reset now clears the selection (sets to empty)
                           setModalState(() => tempSelected.clear());
                         },
                       ),

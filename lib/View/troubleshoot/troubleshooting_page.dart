@@ -62,7 +62,7 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>  QnaListView(), // <-- 你的 QnA 页面
+                        builder: (context) => QnaListView(), // <-- 你的 QnA 页面
                       ),
                     );
                   },
@@ -71,7 +71,6 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
             ),
 
             const SizedBox(height: 10),
-
 
             Wrap(
               spacing: 10,
@@ -85,8 +84,10 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                     });
                   },
                   child: Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.blue : Colors.grey[200],
                       borderRadius: BorderRadius.circular(30),
@@ -98,8 +99,9 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                       cat,
                       style: TextStyle(
                         color: isSelected ? Colors.white : Colors.black,
-                        fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -112,15 +114,9 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
               children: [
                 Text(
                   "Features Guide ",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                Text(
-                  "⭐",
-                  style: TextStyle(fontSize: 18),
-                ),
+                Text("⭐", style: TextStyle(fontSize: 18)),
               ],
             ),
             const SizedBox(height: 10),
@@ -141,7 +137,8 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
 
                   if (items.isEmpty) {
                     return const Center(
-                        child: Text("No guides found for this category."));
+                      child: Text("No guides found for this category."),
+                    );
                   }
 
                   return ListView.builder(
@@ -160,9 +157,8 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => VideoPlayerPage(
-                                  guide: item,
-                                ),
+                                builder: (context) =>
+                                    VideoPlayerPage(guide: item),
                               ),
                             );
                           },
@@ -179,14 +175,14 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                                     height: 80,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
-                                    const Icon(Icons.image_not_supported),
+                                        const Icon(Icons.image_not_supported),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         "Topic: ${item.title}",

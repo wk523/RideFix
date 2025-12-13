@@ -18,14 +18,14 @@ class AuthController {
     UserModel newUser = UserModel(
       uid: uid,
       email: email,
-      name: name,                     // <-- 新增
+      name: name, // <-- 新增
       createdAt: DateTime.now(),
     );
 
     await _firestore.collection('users').doc(uid).set({
       'uid': uid,
       'email': email,
-      'name': name,                   // <-- 新增
+      'name': name, // <-- 新增
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

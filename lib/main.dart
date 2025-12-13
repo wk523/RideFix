@@ -74,7 +74,6 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/qnaList': (context) => QnaListView(),
         '/maintenance': (context) => MaintenanceMainView(),
-
       },
     );
   }

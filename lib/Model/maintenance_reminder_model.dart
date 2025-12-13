@@ -1,42 +1,47 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MaintenanceReminderModel {
-  final String id;
+  final String? id;
   final String userId;
   final String maintenanceType;
   final DateTime dueDateTime;
   final DateTime createdAt;
   final String status;
+  final String? vehicleId; // <-- 1. NEW FIELD to store the selected vehicle ID
 
   MaintenanceReminderModel({
-    this.id = '', // Document ID (optional for creation)
+    this.id,
     required this.userId,
     required this.maintenanceType,
     required this.dueDateTime,
     required this.createdAt,
-    required this.status,
+    this.status = 'active',
+    this.vehicleId, // <-- 2. Added to constructor
   });
 
-  /// Convert model to Firestore map
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
       'maintenanceType': maintenanceType,
-      'dueDateTime': Timestamp.fromDate(dueDateTime), // Stored in UTC
-      'createdAt': Timestamp.fromDate(createdAt),     // Stored in UTC
+      'dueDateTime': Timestamp.fromDate(dueDateTime),
+      'createdAt': Timestamp.fromDate(createdAt),
       'status': status,
+      'vehicleId': vehicleId, // <-- 3. Added to the map for saving to Firestore
     };
   }
 
-  /// Create model instance from Firestore data
-  factory MaintenanceReminderModel.fromMap(String id, Map<String, dynamic> map) {
+  factory MaintenanceReminderModel.fromMap(
+    String id,
+    Map<String, dynamic> map,
+  ) {
     return MaintenanceReminderModel(
-      id: id, // Firestore document ID
-      userId: map['userId'],
-      maintenanceType: map['maintenanceType'],
+      id: id,
+      userId: map['userId'] ?? '',
+      maintenanceType: map['maintenanceType'] ?? '',
       dueDateTime: (map['dueDateTime'] as Timestamp).toDate(),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       status: map['status'] ?? 'active',
+      vehicleId: map['vehicleId'], // <-- 4. Added for reading from Firestore
     );
   }
 }

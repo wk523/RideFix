@@ -87,14 +87,20 @@ class _FuelEntryPageState extends State<FuelEntryPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
+              // Use viewInsets.bottom for keyboard padding, but remove
+              // excessive bottom padding when keyboard is hidden.
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
                 top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                // Use ternary operator to conditionally add padding when keyboard is NOT open (viewInsets.bottom == 0)
+                bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                    ? MediaQuery.of(context).viewInsets.bottom + 16
+                    : 16,
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.max,
+                // ⭐️ FIX: Use MainAxisSize.min to size the column to its children ⭐️
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
@@ -167,6 +173,7 @@ class _FuelEntryPageState extends State<FuelEntryPage> {
                           lastDate: DateTime(2030),
                           initialDateRange: tempDateRange,
                         );
+                        // Use a safe null check for `picked` and update state
                         if (picked != null) {
                           setModalState(() => tempDateRange = picked);
                         }
@@ -178,8 +185,8 @@ class _FuelEntryPageState extends State<FuelEntryPage> {
 
                   // VEHICLE DROPDOWN (Now relies on the map being updated in the main build)
                   _sectionHeader(Icons.directions_car, "Vehicle"),
-                  // 💡 FIX: Use vehicleNames map which is populated outside of this modal
                   DropdownButtonFormField<String>(
+                    // Ensure initialValue is one of the valid values or null
                     initialValue: tempVehicleId ?? "All",
                     decoration: _dropdownDecoration(),
                     items: [
@@ -189,7 +196,7 @@ class _FuelEntryPageState extends State<FuelEntryPage> {
                       ),
                       // Only show vehicles that were loaded into the map
                       ...vehicleNames.entries.map(
-                        (entry) => DropdownMenuItem(
+                            (entry) => DropdownMenuItem(
                           value: entry.key,
                           child: Text(entry.value),
                         ),
@@ -220,7 +227,7 @@ class _FuelEntryPageState extends State<FuelEntryPage> {
                           setModalState(() {
                             tempSort = "date";
                             tempDateRange = null;
-                            tempVehicleId = null;
+                            tempVehicleId = "All"; // Reset to "All" instead of null
                           });
                         },
                       ),

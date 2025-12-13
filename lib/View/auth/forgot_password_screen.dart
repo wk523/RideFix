@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '/widgets/custom_textfield.dart';
+import 'package:ridefix/widgets/custom_textfield.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -22,13 +22,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _auth.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
+      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Password reset email sent! Please check your inbox.'),
+          content: Text(
+            '✅ Password reset email sent! Please check your inbox.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -67,7 +67,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               top: 10,
               left: 10,
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black, size: 28),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.black,
+                  size: 28,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -85,7 +89,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       const SizedBox(height: 20),
                       const Text(
                         "Forgot Password",
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
@@ -122,14 +129,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         child: _isLoading
                             ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                            : const Text("Next", style: TextStyle(fontSize: 16)),
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                "Next",
+                                style: TextStyle(fontSize: 16),
+                              ),
                       ),
                     ],
                   ),
