@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:ridefix/View/ExpensesAnalytics/ExpensesAnalytics.dart';
 import 'package:ridefix/View/Fuel&MileageAnalytics/FuelAnalytics.dart';
 import 'package:ridefix/View/Fuel&MileageAnalytics/FuelEntry.dart';
 import 'package:ridefix/View/RoadsideEmergency/EmergencyService.dart';
 import 'package:ridefix/View/ServiceRecord/ServiceRecord.dart';
 import 'package:ridefix/View/VehicleMaintenance/VehicleList.dart';
+import 'package:ridefix/View/maintenance/edit_active_reminder_page.dart';
+import 'package:ridefix/View/maintenance/edit_reminder_form_page.dart';
 import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 import 'package:ridefix/View/parking/parking_main_page.dart';
 import 'package:ridefix/View/profile/profile_screen.dart';
@@ -13,8 +16,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:ridefix/View/troubleshoot/troubleshooting_page.dart';
 import 'package:ridefix/View/workshop/workshop_locator_page.dart';
-import '../../Controller/EmergencyService/EmergencyServiceController.dart';
+import 'package:ridefix/Controller/EmergencyService/EmergencyServiceController.dart';
 import 'Controller/ExpensesAnalytics/ExpensesAnalyticsConrtoller.dart';
+import 'package:ridefix/model/user_model.dart';
+import 'package:ridefix/Controller/maintenance_reminder_controller.dart';
+import 'package:ridefix/model/maintenance_reminder_model.dart';
 
 class HomePage extends StatelessWidget {
   final DocumentSnapshot userDoc;
@@ -36,17 +42,7 @@ class HomePage extends StatelessWidget {
 }
 
 // --- 1. Dashboard Data Models ---
-
-class Reminder {
-  final String type;
-  final String category;
-  final String date;
-  final String time;
-  final String status;
-
-  Reminder(this.type, this.category, this.date, this.time, this.status);
-}
-
+// NOTE: Expense model is kept for the ThisMonthExpenseOverview widget
 class Expense {
   final String category;
   final double amount;
@@ -55,14 +51,6 @@ class Expense {
   Expense(this.category, this.amount, this.color);
 }
 
-final List<Reminder> reminders = [
-  Reminder('Oil Change', 'Maintenance', 'Oct 24, 2025', '10:47', 'Due Soon'),
-  Reminder('Road Tax Renewal', 'Road Tax', 'Nov 06, 2025', '10:47', 'Upcoming'),
-  Reminder('Tire Rotation', 'Maintenance', 'Oct 20, 2025', '10:47', 'Overdue'),
-];
-
-// Removed hardcoded expenses list and totalExpenseAmount
-// This data will now be fetched dynamically by ThisMonthExpenseOverview
 
 // --- 2. Custom Widgets for Dashboard ---
 
@@ -114,75 +102,6 @@ class QuickActionButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class ReminderItem extends StatelessWidget {
-  final Reminder reminder;
-
-  const ReminderItem({super.key, required this.reminder});
-
-  Color getStatusColor(String status) {
-    switch (status) {
-      case 'Overdue':
-        return Colors.red;
-      case 'Due Soon':
-        return Colors.orange;
-      case 'Upcoming':
-      default:
-        return Colors.grey.shade600;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = getStatusColor(reminder.status);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                reminder.type,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                reminder.category,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${reminder.date} • ${reminder.time}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: statusColor, width: 0.5),
-            ),
-            child: Text(
-              reminder.status,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: statusColor,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -247,7 +166,6 @@ class ThisMonthExpenseOverview extends StatefulWidget {
 }
 
 class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
-  // ⭐️ 1. Instantiate the actual database controller ⭐️
   final _db = ExpensesAnalyticsDatabase();
 
   double _totalAmount = 0.0;
@@ -260,17 +178,14 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
     _fetchThisMonthExpenses(widget.userDoc.id);
   }
 
-  // ⭐️ 2. Fetch data using the actual controller method ⭐️
   Future<void> _fetchThisMonthExpenses(String userId) async {
-    // Current date is the reference date for the current month
     final currentDate = DateTime.now();
 
     try {
-      // Use fetchExpensesByCategory with 'MONTHS' duration to get the current month's totals
       final Map<String, double> fetchedCategoryData =
       await _db.fetchExpensesByCategory(
         uid: userId,
-        duration: 'MONTHS', // We want the current month's breakdown
+        duration: 'MONTHS',
         referenceDate: currentDate,
       );
 
@@ -279,14 +194,11 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
             (sum, amount) => sum + amount,
       );
 
-      // Convert the fetched Map into a List<Expense>
       final List<Expense> expensesList = fetchedCategoryData.entries.map((entry) {
-        // Map category names to colors for the dashboard bars
         Color color = _getColorForCategory(entry.key);
         return Expense(entry.key, entry.value, color);
       }).toList();
 
-      // Sort expenses by amount (highest first)
       expensesList.sort((a, b) => b.amount.compareTo(a.amount));
 
       if (mounted) {
@@ -306,9 +218,7 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
     }
   }
 
-  // ⭐️ 3. Helper function for consistent color mapping ⭐️
   Color _getColorForCategory(String category) {
-    // You must match these colors to what you use in ExpensesAnalytics.dart for consistency
     switch (category) {
       case 'Fuel':
         return Colors.blue;
@@ -327,9 +237,7 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading indicator
     if (_isLoading) {
-      // ... (Loading UI remains the same)
       return Card(
         margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 24.0),
         elevation: 2,
@@ -346,9 +254,7 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
       );
     }
 
-    // Show empty state if no data
     if (_categoryExpenses.isEmpty && _totalAmount == 0.0) {
-      // ... (Empty state UI remains the same)
       return Card(
         margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 24.0),
         elevation: 2,
@@ -370,7 +276,6 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
       );
     }
 
-    // Build the Card UI with fetched data
     return Card(
       margin: const EdgeInsets.only(
         left: 16.0,
@@ -398,7 +303,6 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Display the correct, fetched total amount
                 Text(
                   'RM ${_totalAmount.toStringAsFixed(0)}',
                   style: const TextStyle(
@@ -408,7 +312,6 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
                   ),
                 ),
                 const Spacer(),
-                // NOTE: This trend indicator is still static/mocked for now
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -439,7 +342,6 @@ class _ThisMonthExpenseOverviewState extends State<ThisMonthExpenseOverview> {
               ],
             ),
             const SizedBox(height: 16),
-            // Use the actual fetched category expenses to build the bars
             ..._categoryExpenses.map(
                   (exp) => ExpenseBar(
                 expense: exp,
@@ -466,7 +368,6 @@ class AppDrawer extends StatelessWidget {
     required VoidCallback onTap,
     bool isSelected = false,
   }) {
-    // ... (No change to this helper function)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: Material(
@@ -504,7 +405,6 @@ class AppDrawer extends StatelessWidget {
   }
 
   Widget _buildHeader(String title) {
-    // ... (No change)
     return Padding(
       padding: const EdgeInsets.only(left: 20.0, top: 16.0, bottom: 8.0),
       child: Text(
@@ -521,6 +421,7 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final users = context.watch<UserModel?>();
     const String currentPage = 'Home';
 
     return Drawer(
@@ -528,7 +429,6 @@ class AppDrawer extends StatelessWidget {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: Column(
         children: [
-          // Branding Header (No change)
           Padding(
             padding: const EdgeInsets.only(
               top: 40.0,
@@ -573,25 +473,21 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-          // Navigation Items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                // Main Menu
                 _buildHeader('Main Menu'),
                 _buildDrawerItem(
                   title: 'Home',
                   icon: Icons.home_outlined,
-                  onTap: () => Navigator.pop(context), // Close the drawer
+                  onTap: () => Navigator.pop(context),
                   isSelected: currentPage == 'Home',
                 ),
                 _buildDrawerItem(
                   title: 'My Vehicles',
                   icon: Icons.directions_car_outlined,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -618,7 +514,6 @@ class AppDrawer extends StatelessWidget {
                   title: 'Service Records',
                   icon: Icons.file_copy_outlined,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -629,8 +524,6 @@ class AppDrawer extends StatelessWidget {
                     );
                   },
                 ),
-
-                // Services
                 _buildHeader('Services'),
                 _buildDrawerItem(
                   title: 'Workshop Locator',
@@ -675,7 +568,6 @@ class AppDrawer extends StatelessWidget {
                   title: 'Fuel Tracking',
                   icon: Icons.local_gas_station_outlined,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -685,14 +577,11 @@ class AppDrawer extends StatelessWidget {
                     );
                   },
                 ),
-
-                // Analytics & Help
                 _buildHeader('Analytics & Help'),
                 _buildDrawerItem(
                   title: 'Expense Analytics',
                   icon: Icons.trending_up,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -707,7 +596,6 @@ class AppDrawer extends StatelessWidget {
                   title: 'Fuel Analytics',
                   icon: Icons.trending_up,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -722,10 +610,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'Emergency Assistance',
                   icon: Icons.help_outline,
                   onTap: () {
-                    // Close the drawer before navigating
                     Navigator.pop(context);
-
-                    // 🔥 FIX: Removed the redundant ChangeNotifierProvider wrapper
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -738,62 +623,58 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-
-          // User Profile Footer (No change in navigation logic here, only for profile)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                InkWell(
-                  onTap: () {
-                    // Close the drawer before navigating
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfileScreen()),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        backgroundColor: Color(0xFFDCEAFB),
-                        child: Text(
-                          'JD',
-                          style: TextStyle(
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ProfileScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: Color(0xFFDCEAFB),
+                          child: Icon(
+                            Icons.person,
                             color: Color(0xFF1E40AF),
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'John Doe',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (userDoc.data() as Map<String, dynamic>?)?['name'] as String? ?? 'User',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              Text(
+                                (userDoc.data() as Map<String, dynamic>?)?['email'] as String? ?? 'No email',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
                           ),
-                          // Text(
-                          //   'WXY 1234',
-                          //   style: TextStyle(fontSize: 12, color: Colors.grey),
-                          // ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    size: 24,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {},
                 ),
               ],
             ),
@@ -816,31 +697,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  User? user;
-  bool loading = true;
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    loadUserData();
-  }
-
-  Future<void> loadUserData() async {
-    user = _auth.currentUser;
-
-    if (user != null) {
-      // The doc is already passed in widget.userDoc, but fetching here for state management context.
-      // Keeping this simplified for the dashboard view.
-      // final doc = await _firestore.collection('users').doc(user!.uid).get();
-
-      setState(() {
-        loading = false;
-      });
-    }
-  }
+  // ⭐️ 1. Add the controller to fetch live reminder data
+  final MaintenanceReminderController _reminderController = MaintenanceReminderController();
 
   Widget _buildSectionHeader(
       String title, {
@@ -848,7 +706,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         VoidCallback? onActionTap,
       }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+      padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 16.0, right: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -876,6 +734,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ⭐️ 2. New widget to build the dynamic reminder list
+  Widget _buildUpcomingReminders() {
+    return StreamBuilder<List<MaintenanceReminderModel>>(
+      stream: _reminderController.getActiveReminders(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Card(
+            margin: EdgeInsets.symmetric(horizontal: 16.0),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: Center(child: Text("You have no upcoming reminders.")),
+            ),
+          );
+        }
+
+        final reminders = snapshot.data!;
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          itemCount: reminders.length > 3 ? 3 : reminders.length, // Show a max of 3
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final reminder = reminders[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                title: Text(reminder.maintenanceType, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text("Due on: ${DateFormat('dd MMM yyyy, hh:mm a').format(reminder.dueDateTime.toLocal())}"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => EditReminderFormPage(reminder: reminder)),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -888,70 +796,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(
-              context,
-            ).openDrawer(), // This opens the drawer when the icon is clicked
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        // title: Container(
-        //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        //   decoration: BoxDecoration(
-        //     color: Colors.blue.shade50,
-        //     borderRadius: BorderRadius.circular(10),
-        //   ),
-        //   child: const Row(
-        //     mainAxisSize: MainAxisSize.min,
-        //     // children: [
-        //     //   Icon(Icons.directions_car, size: 14, color: Colors.black54),
-        //     //   SizedBox(width: 8),
-        //     //   Text(
-        //     //     'WXY 1234',
-        //     //     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        //     //   ),
-        //     //   SizedBox(width: 8),
-        //     //   Icon(Icons.arrow_drop_down, size: 14, color: Colors.black54),
-        //     // ],
-        //   ),
-        // ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {},
-          ),
-        ],
       ),
-      drawer: AppDrawer(userDoc: widget.userDoc), // Attach the custom drawer
-
+      drawer: AppDrawer(userDoc: widget.userDoc),
       body: CustomScrollView(
         slivers: [
           SliverList(
             delegate: SliverChildListDelegate([
-              // Dashboard Header
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Dashboard',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      'Welcome back to RideFix!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    const Text('Dashboard', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    Text('Welcome back to RideFix!', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
                   ],
                 ),
               ),
-
-              // Quick Actions Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: _buildSectionHeader('Quick Actions'),
@@ -965,89 +828,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    QuickActionButton(
-                      icon: Icons.phone_enabled_outlined,
-                      label: 'Emergency SOS',
-                      color: Colors.red.shade500,
-                      onTap: () {
-                        // 🔥 FIX: Removed the redundant ChangeNotifierProvider wrapper
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                EmergencyServicePage(userDoc: widget.userDoc),
-                          ),
-                        );
-                      },
-                    ),
-                    QuickActionButton(
-                      icon: Icons.access_time,
-                      label: 'Maintenance Reminder',
-                      color: Colors.blue.shade500,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MaintenanceMainView(),
-                          ),
-                        );
-                      },
-                    ),
-                    QuickActionButton(
-                      icon: Icons.location_on_outlined,
-                      label: 'Find Workshop',
-                      color: Colors.blue.shade500,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WorkshopLocatorPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    QuickActionButton(
-                      icon: Icons.add_card_outlined,
-                      label: 'Service Record',
-                      color: Colors.blue.shade500,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ServiceRecordPage(userDoc: widget.userDoc),
-                          ),
-                        );
-                      },
-                    ),
+                    QuickActionButton(icon: Icons.phone_enabled_outlined, label: 'Emergency SOS', color: Colors.red.shade500, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EmergencyServicePage(userDoc: widget.userDoc)))),
+                    QuickActionButton(icon: Icons.access_time, label: 'Maintenance Reminder', color: Colors.blue.shade500, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MaintenanceMainView()))),
+                    QuickActionButton(icon: Icons.location_on_outlined, label: 'Find Workshop', color: Colors.blue.shade500, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WorkshopLocatorPage()))),
+                    QuickActionButton(icon: Icons.add_card_outlined, label: 'Service Record', color: Colors.blue.shade500, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ServiceRecordPage(userDoc: widget.userDoc)))),
                   ],
                 ),
               ),
 
-              // Upcoming Reminders Section (Initial View)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildSectionHeader(
-                  'Upcoming Reminders',
-                  actionText: 'View All >',
-                  onActionTap: () {},
-                ),
+              // ⭐️ 3. This section is now fully dynamic ⭐️
+              _buildSectionHeader(
+                'Upcoming Reminders',
+                actionText: 'View All >',
+                onActionTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EditActiveReminderPage(),
+                    ),
+                  );
+                },
               ),
-              Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: reminders
-                        .map((r) => ReminderItem(reminder: r))
-                        .toList(),
-                  ),
-                ),
-              ),
+              _buildUpcomingReminders(),
 
               // This Month/Expense Overview Section
               Padding(
@@ -1055,23 +857,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: _buildSectionHeader(
                   'This Month',
                   actionText: 'View Analytics >',
-                  onActionTap: () {
-                    // Navigate to the ExpensesAnalyticsPage
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ExpensesAnalyticsPage(userDoc: widget.userDoc),
-                      ),
-                    );
-                  },
+                  onActionTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExpensesAnalyticsPage(userDoc: widget.userDoc))),
                 ),
               ),
-
-              // ⭐️ DYNAMIC EXPENSE OVERVIEW ⭐️
               ThisMonthExpenseOverview(userDoc: widget.userDoc),
 
-              // Added some padding for the bottom of the scroll view
               const SizedBox(height: 16.0),
             ]),
           ),
@@ -1079,35 +869,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-}
-
-// Helper widget for the small action buttons (Find Workshop / Add Service)
-Widget _buildSmallActionButton(IconData icon, String label) {
-  return Card(
-    elevation: 2,
-    margin: EdgeInsets.zero,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: InkWell(
-      onTap: () {},
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: Colors.blue.shade600),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
