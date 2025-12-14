@@ -247,10 +247,10 @@ class EmergencyServiceController extends ChangeNotifier {
   Future<void> _fetchNearbyServices(LatLng location) async {
     // 🚩 FIX: Restored the correct, comma-separated list of recognized Place Types
     const String searchType =
-        "car_repair,tow_truck,tire_shop,gas_station,car_wash,car_parts_store";
+        "car_repair,tow_truck,tire_shop,gas_station,car_wash,car_parts_store, ambulance, first_aid,petrol_station";
 
     final textSearchQuery = Uri.encodeComponent(
-      "24 hour car repair or towing service",
+      "24 hour emergency service, car repair, towing, petrol station, and ambulance",
     );
     final textSearchUrl = Uri.parse(
       'https://maps.googleapis.com/maps/api/place/textsearch/json?'
@@ -277,10 +277,14 @@ class EmergencyServiceController extends ChangeNotifier {
       'repair',
       'service',
       'garage',
+      'gas_station',
+      'petrol',
       'mechanic',
       'auto',
       'towing',
       'tyre',
+      'ambulance',
+      'first_aid',
     ];
 
     // Stricter list of unwanted types
@@ -314,7 +318,10 @@ class EmergencyServiceController extends ChangeNotifier {
           resultTypes.contains('car_repair') ||
               resultTypes.contains('tow_truck') ||
               resultTypes.contains('gas_station') ||
-              resultTypes.contains('mechanic');
+              resultTypes.contains('petrol') ||
+              resultTypes.contains('mechanic') ||
+              resultTypes.contains('ambulance') ||
+              resultTypes.contains('first_aid');
 
       // Check 3: Does the name contain a relevant service keyword?
       final bool nameIsRelevant = serviceKeywords.any(
@@ -566,7 +573,7 @@ class EmergencyServiceController extends ChangeNotifier {
 
     // ✅ NEW: Create the clickable Google Maps URL
     final String mapUrl = 'https://maps.google.com/?q=${userLocation.latitude},${userLocation.longitude}';
-
+    // final String mapUrl = 'https://www.google.com/maps/search/?api=1&query=${userLocation.latitude},${userLocation.longitude}';
 
     // 1. Compile SOS Message (Updated GPS line to be clickable)
     final sosMessage = '''
