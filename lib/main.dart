@@ -23,7 +23,6 @@ import 'package:ridefix/View/maintenance/maintenance_main_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().initialize();
   try {
     // Initialize Firebase
     await Firebase.initializeApp();

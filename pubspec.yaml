@@ -29,6 +29,12 @@ dependencies:
   intl: ^0.19.0
   cupertino_icons: ^1.0.8
 
+# Pin shared_preferences_android to the last pure-Java release (2.3.x).
+# Version 2.4.x moved StringListObjectInputStream to Kotlin, which fails to
+# compile with Flutter 3.32.5 / Kotlin 2.1.0 (cannot find symbol error).
+dependency_overrides:
+  shared_preferences_android: ">=2.3.0 <2.4.0"
+
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_test:
